@@ -1,1 +1,7 @@
-Use this file to explain what has changed in your add-on since the previous release. This will be included automatically in the release description when used with GitHub actions.
+# Changelog
+
+## 2026.01.31
+- Primeira versão publicada.
+- Leitura e navegação por livro/capítulo/versículo.
+- Pesquisa, favoritos, anotações e cópia/compartilhamento.
+- Atalho `Ctrl+Alt+B` para abrir a janela principal.

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" type="text/css" href="../style.css" media="screen">
+<title>Open Bible 2026.01.31</title>
+</head>
+<body>
+<h1>Open Bible (NVDA Add-on)</h1>
+<p>Add-on do <strong>NVDA</strong> para leitura da Bíblia Sagrada em várias versões (arquivos JSON), com navegação por <strong>livro → capítulo → versículo</strong>, pesquisa e recursos de produtividade.</p>
+<ul>
+<li><strong>Atalho principal:</strong> <code>Ctrl+Alt+B</code> (abre a janela do Open Bible)</li>
+</ul>
+<h2>Recursos</h2>
+<ul>
+<li>Seleção de <strong>versões</strong> (arquivos <code>.json</code>) e gerenciamento das versões instaladas</li>
+<li>Navegação rápida por livro, capítulo e versículo</li>
+<li><strong>Pesquisa</strong> de texto</li>
+<li><strong>Favoritos</strong> e <strong>anotações</strong></li>
+<li><strong>Copiar/compartilhar</strong> versículos (área de transferência do Windows)</li>
+</ul>
+<h2>Pasta <code>biblias/</code> (não incluída neste ZIP)</h2>
+<p>Por padrão, o add-on procura as versões em <code>addon/biblias/</code> (sem acento).  </p>
+<p>Exemplos de nomes de arquivo:
+- <code>01_ACF.json</code>
+- <code>02_NVI.json</code></p>
+<h2>Instalação (usuário final)</h2>
+<ol>
+<li>Baixe o arquivo <code>*.nvda-addon</code> na página de releases do GitHub.</li>
+<li>Abra o arquivo e confirme a instalação no NVDA.</li>
+<li>Reinicie o NVDA se solicitado.</li>
+<li>Use <code>Ctrl+Alt+B</code> para abrir o Open Bible.</li>
+</ol>
+<h2>Desenvolvimento / Compilação do add-on</h2>
+<p>Este repositório usa o template oficial com <strong>SCons</strong>.</p>
+<p>Requisitos (Linux / GitHub Actions):
+- Python 3.11+
+- <code>gettext</code>
+- <code>scons</code>, <code>pre-commit</code>, <code>markdown</code></p>
+<p>Comandos:
+<code>bash
+python -m pip install -U pip wheel
+pip install scons pre-commit markdown
+scons</code></p>
+<p>Para gerar o arquivo POT (traduções):
+<code>bash
+scons pot</code></p>
+<h2>Licença</h2>
+<p>Este projeto é distribuído sob a <strong>GPL v2</strong> (veja <code>COPYING.txt</code>).</p>
+<h2>Créditos</h2>
+<p>Desenvolvido por <strong>Leandro Souza</strong>.</p>
+</body>
+</html>
