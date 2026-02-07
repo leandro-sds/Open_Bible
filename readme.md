@@ -12,7 +12,7 @@ Add-on do **NVDA** para leitura da Bíblia Sagrada em várias versões (arquivos
 - **Favoritos** e **anotações**
 - **Copiar/compartilhar** versículos (área de transferência do Windows)
 
-## Pasta `biblias/` (não incluída neste ZIP)
+## Pasta `biblias/` (Incluída neste ZIP)
 
 Por padrão, o add-on procura as versões em `addon/biblias/` (sem acento).  
 
@@ -30,23 +30,6 @@ Exemplos de nomes de arquivo:
 ## Desenvolvimento / Compilação do add-on
 
 Este repositório usa o template oficial com **SCons**.
-
-Requisitos (Linux / GitHub Actions):
-- Python 3.11+
-- `gettext`
-- `scons`, `pre-commit`, `markdown`
-
-Comandos:
-```bash
-python -m pip install -U pip wheel
-pip install scons pre-commit markdown
-scons
-```
-
-Para gerar o arquivo POT (traduções):
-```bash
-scons pot
-```
 
 ## Licença
 
