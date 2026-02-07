@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026.01.31
+## 2026.02.07
 - Primeira versão publicada.
 - Leitura e navegação por livro/capítulo/versículo.
 - Pesquisa, favoritos, anotações e cópia/compartilhamento.

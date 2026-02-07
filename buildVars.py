@@ -26,7 +26,7 @@ addon_info = AddonInfo(
 		Você pode navegar por livro, capítulo e versículo, pesquisar, favoritar, anotar e copiar/compartilhar versículos."""
 	),
 	# version
-	addon_version="2026.01.31",
+	addon_version="2026.02.07",
 	# Brief changelog for this version
 	# Translators: what's new content for the add-on version to be shown in the add-on store
 	addon_changelog=_(
@@ -44,7 +44,7 @@ addon_info = AddonInfo(
 	# Minimum NVDA version supported (e.g. "2019.3.0", minor version is optional)
 	addon_minimumNVDAVersion="2024.1",
 	# Last NVDA version supported/tested (e.g. "2024.4.0", ideally more recent than minimum version)
-	addon_lastTestedNVDAVersion="2025.2.3",
+	addon_lastTestedNVDAVersion="2025.3.2",
 	# Add-on update channel (default is None, denoting stable releases, and for development releases, use "dev".)
 	# Do not change unless you know what you are doing!
 	addon_updateChannel=None,
