@@ -26,7 +26,7 @@ addon_info = AddonInfo(
 		Você pode navegar por livro, capítulo e versículo, pesquisar, favoritar, anotar e copiar/compartilhar versículos."""
 	),
 	# version
-	addon_version="2026.02.07",
+	addon_version="2026.02.13",
 	# Brief changelog for this version
 	# Translators: what's new content for the add-on version to be shown in the add-on store
 	addon_changelog=_(

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" type="text/css" href="../style.css" media="screen">
-<title>Open Bible 2026.01.31</title>
+<title>Open Bible 2026.02.13</title>
 </head>
 <body>
 <h1>Open Bible (NVDA Add-on)</h1>
@@ -20,7 +20,7 @@
 <li><strong>Favoritos</strong> e <strong>anotações</strong></li>
 <li><strong>Copiar/compartilhar</strong> versículos (área de transferência do Windows)</li>
 </ul>
-<h2>Pasta <code>biblias/</code> (não incluída neste ZIP)</h2>
+<h2>Pasta <code>biblias/</code> (Incluída neste ZIP)</h2>
 <p>Por padrão, o add-on procura as versões em <code>addon/biblias/</code> (sem acento).  </p>
 <p>Exemplos de nomes de arquivo:
 - <code>01_ACF.json</code>
@@ -34,18 +34,6 @@
 </ol>
 <h2>Desenvolvimento / Compilação do add-on</h2>
 <p>Este repositório usa o template oficial com <strong>SCons</strong>.</p>
-<p>Requisitos (Linux / GitHub Actions):
-- Python 3.11+
-- <code>gettext</code>
-- <code>scons</code>, <code>pre-commit</code>, <code>markdown</code></p>
-<p>Comandos:
-<code>bash
-python -m pip install -U pip wheel
-pip install scons pre-commit markdown
-scons</code></p>
-<p>Para gerar o arquivo POT (traduções):
-<code>bash
-scons pot</code></p>
 <h2>Licença</h2>
 <p>Este projeto é distribuído sob a <strong>GPL v2</strong> (veja <code>COPYING.txt</code>).</p>
 <h2>Créditos</h2>
