@@ -3285,7 +3285,7 @@ class BibliaFrame (wx .Frame ):
 
 		btnImportar .Bind (wx .EVT_BUTTON ,onImportar )
 		btnRemover .Bind (wx .EVT_BUTTON ,onRemover )
-		btnBaixar .Bind (wx .EVT_BUTTON ,lambda e :webbrowser .open ("https://github.com/leandro-sds/Open_Bible/tree/master/addon/globalPlugins/biblias"))
+		btnBaixar .Bind (wx .EVT_BUTTON ,lambda e :webbrowser .open ("https://drive.google.com/drive/folders/1THS2L9GiCx_rWWCJ23JGh3Ws7qVup0uE?usp=sharing"))
 		btnTornarPadrao .Bind (wx .EVT_BUTTON ,onTornarPadrao )
 		btnFechar .Bind (wx .EVT_BUTTON ,lambda e :dlg .Close ())
 
