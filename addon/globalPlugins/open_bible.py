@@ -206,6 +206,10 @@ class ReadChaptersManager :
 		_ensure_addon_config_dir ()
 		self .path =os .path .join (NVDA_CONFIG_BASE ,"capitulos_lidos.json")
 		self .lidos =self ._load ()
+		self ._lidos_set =self ._build_set ()
+
+	def _build_set (self ):
+		return {(item ["livro"],item ["capitulo"])for item in self .lidos }
 
 	def _load (self ):
 		try :
@@ -224,14 +228,12 @@ class ReadChaptersManager :
 			return []
 
 	def is_read (self ,livro ,capitulo ):
-		for item in self .lidos :
-			if item ["livro"]==livro and item ["capitulo"]==capitulo :
-				return True 
-		return False 
+		return (livro ,capitulo )in self ._lidos_set 
 
 	def mark_read (self ,livro ,capitulo ):
 		self .remove (livro ,capitulo )
 		self .lidos .insert (0 ,{"livro":livro ,"capitulo":capitulo })
+		self ._lidos_set .add ((livro ,capitulo ))
 		self ._save ()
 
 	def remove (self ,livro ,capitulo ):
@@ -239,6 +241,7 @@ class ReadChaptersManager :
 		item for item in self .lidos 
 		if not (item ["livro"]==livro and item ["capitulo"]==capitulo )
 		]
+		self ._lidos_set .discard ((livro ,capitulo ))
 		self ._save ()
 
 	def all (self ):
@@ -407,6 +410,107 @@ def normalizar (txt ):
 	if unicodedata .category (c )!='Mn'
 	).lower ()
 
+class ListaWrapper (wx .ListCtrl ):
+	"""
+	Substituto de wx.ListBox baseado em wx.ListCtrl (LC_REPORT).
+	Expõe a mesma API usada pelo Open Bible, eliminando o travamento
+	causado pela criação dinâmica de scrollbar do ListBox nativo do Windows.
+	"""
+	def __init__ (self ,parent ,name ="Lista de seleção"):
+		super ().__init__ (
+			parent ,
+			style =wx .LC_REPORT |wx .LC_SINGLE_SEL |wx .LC_NO_HEADER ,
+			name =name 
+		)
+		self ._itens =[]
+		col =wx .ListItem ()
+		col .SetText ("")
+		col .SetWidth (-2 )
+		self .InsertColumn (0 ,col )
+		self .Bind (wx .EVT_SIZE ,self ._onResize )
+
+	def _onResize (self ,event ):
+		try :
+			w =self .GetClientSize ().width 
+			if w >0 :
+				self .SetColumnWidth (0 ,w )
+		except Exception :
+			pass 
+		event .Skip ()
+
+	def _syncColWidth (self ):
+		try :
+			w =self .GetClientSize ().width 
+			if w >0 :
+				self .SetColumnWidth (0 ,w )
+		except Exception :
+			pass 
+
+	# --- API compatível com wx.ListBox ---
+
+	def Clear (self ):
+		self .DeleteAllItems ()
+		self ._itens =[]
+
+	def GetCount (self ):
+		return self .GetItemCount ()
+
+	def GetString (self ,idx ):
+		if 0 <=idx <len (self ._itens ):
+			return self ._itens [idx ]
+		return ""
+
+	def SetString (self ,idx ,s ):
+		if 0 <=idx <len (self ._itens ):
+			self ._itens [idx ]=s 
+			self .SetItemText (idx ,s )
+
+	def Append (self ,s ):
+		idx =self .InsertItem (self .GetItemCount (),s )
+		self ._itens .append (s )
+		return idx 
+
+	def AppendItems (self ,strings ):
+		self .Freeze ()
+		try :
+			for s in strings :
+				self .InsertItem (self .GetItemCount (),s )
+				self ._itens .append (s )
+			self ._syncColWidth ()
+		finally :
+			self .Thaw ()
+
+	def Delete (self ,idx ):
+		if 0 <=idx <self .GetItemCount ():
+			self .DeleteItem (idx )
+			if 0 <=idx <len (self ._itens ):
+				del self ._itens [idx ]
+
+	def GetSelection (self ):
+		idx =self .GetNextItem (-1 ,wx .LIST_NEXT_ALL ,wx .LIST_STATE_SELECTED )
+		return idx if idx !=-1 else wx .NOT_FOUND 
+
+	def SetSelection (self ,idx ):
+		current =self .GetSelection ()
+		if current !=wx .NOT_FOUND and current !=idx :
+			self .SetItemState (current ,0 ,wx .LIST_STATE_SELECTED |wx .LIST_STATE_FOCUSED )
+		if idx ==wx .NOT_FOUND :
+			return 
+		count =self .GetItemCount ()
+		if 0 <=idx <count :
+			self .SetItemState (idx ,wx .LIST_STATE_SELECTED |wx .LIST_STATE_FOCUSED ,wx .LIST_STATE_SELECTED |wx .LIST_STATE_FOCUSED )
+
+	def EnsureVisible (self ,idx ):
+		count =self .GetItemCount ()
+		if 0 <=idx <count :
+			super ().EnsureVisible (idx )
+
+	def SetBackgroundColour (self ,colour ):
+		super ().SetBackgroundColour (colour )
+
+	def SetForegroundColour (self ,colour ):
+		super ().SetForegroundColour (colour )
+
 class BibliaFrame (wx .Frame ):
 	def __init__ (self ,biblia ,notas ,bibleManager ,notesManager ,versaoAtual ,configManager ,favoritesManager ):
 		super ().__init__ (None ,title ="Open Bible",size =(1100 ,750 ))
@@ -435,7 +539,6 @@ class BibliaFrame (wx .Frame ):
 
 		self .ultimoContextoBusca =None 
 		self .favoritos =self .favoritesManager .all ()
-		self .nivelFavoritos ="favoritos"
 		self .favPaginaAtual =0 
 		self .favItensPorPagina =10 
 
@@ -448,6 +551,7 @@ class BibliaFrame (wx .Frame ):
 
 		self ._lastVisitedBook =None 
 		self ._lastVisitedChapter =None 
+		self ._precisaBoasVindas =True 
 
 		self ._navigationStack =[]
 
@@ -456,6 +560,12 @@ class BibliaFrame (wx .Frame ):
 		self ._markedIndices =set ()
 		self ._clipboardInProgress =False 
 		self ._primeira_exibicao =True 
+		self ._txtUpdateTimer =wx .Timer (self )
+		self .Bind (wx .EVT_TIMER ,self ._onTxtUpdateTick ,self ._txtUpdateTimer )
+		self ._pendingTxtVerso =None 
+		self ._pendingBeepCap =False 
+		self ._savePositionTimer =wx .Timer (self )
+		self .Bind (wx .EVT_TIMER ,self ._onSavePositionTick ,self ._savePositionTimer )
 
 		menuBar =wx .MenuBar ()
 		menuArquivo =wx .Menu ()
@@ -522,13 +632,20 @@ class BibliaFrame (wx .Frame ):
 
 		navSizer =wx .BoxSizer (wx .HORIZONTAL )
 
-		self .lista =wx .ListBox (mainPanel ,style =wx .LB_SINGLE ,name ="Lista de seleção")
-		navSizer .Add (self .lista ,1 ,wx .EXPAND |wx .ALL ,8 )
+		self ._listaCtrl =ListaWrapper (mainPanel ,name ="Lista de seleção")
+		self ._listaBox =wx .ListBox (mainPanel ,style =wx .LB_SINGLE |wx .LB_ALWAYS_SB ,name ="Lista de seleção")
+		self ._listaBox .Hide ()
+		self .lista =self ._listaCtrl 
+		self ._navSizer =navSizer 
+		navSizer .Add (self ._listaCtrl ,1 ,wx .EXPAND |wx .ALL ,8 )
+		navSizer .Add (self ._listaBox ,1 ,wx .EXPAND |wx .ALL ,8 )
 
 		self .btnSizer =wx .BoxSizer (wx .VERTICAL )
 		self .btnAnterior =wx .Button (mainPanel ,label ="Capítulo Anterior")
 		self .btnMarcarLido =wx .Button (mainPanel ,label ="Marcar capítulo como lido")
 		self .btnProximo =wx .Button (mainPanel ,label ="Próximo Capítulo")
+		self .btnLivroAnterior =wx .Button (mainPanel ,label ="Livro Anterior")
+		self .btnProximoLivro =wx .Button (mainPanel ,label ="Próximo Livro")
 		self .btnCopiar =wx .Button (mainPanel ,label ="Copiar Seleção/Versículo")
 		self .btnAdicionarNota =wx .Button (mainPanel ,label ="Adicionar Nota")
 		self .btnRemoverNota =wx .Button (mainPanel ,label ="Remover Nota")
@@ -538,8 +655,10 @@ class BibliaFrame (wx .Frame ):
 		self .btnPagProxima =wx .Button (mainPanel ,label ="Próxima Página")
 		self .btnLimparBusca =wx .Button (mainPanel ,label ="Limpar Busca")
 
+		self .btnSizer .Add (self .btnLivroAnterior ,0 ,wx .EXPAND |wx .ALL ,5 )
 		self .btnSizer .Add (self .btnAnterior ,0 ,wx .EXPAND |wx .ALL ,5 )
 		self .btnSizer .Add (self .btnProximo ,0 ,wx .EXPAND |wx .ALL ,5 )
+		self .btnSizer .Add (self .btnProximoLivro ,0 ,wx .EXPAND |wx .ALL ,5 )
 		self .btnSizer .Add (self .btnMarcarLido ,0 ,wx .EXPAND |wx .ALL ,5 )
 
 		self .btnSizer .Add (self .btnCopiar ,0 ,wx .EXPAND |wx .ALL ,5 )
@@ -552,7 +671,7 @@ class BibliaFrame (wx .Frame ):
 		self .btnSizer .Add (self .btnLimparBusca ,0 ,wx .EXPAND |wx .ALL ,5 )
 
 		navSizer .Add (self .btnSizer ,0 ,wx .EXPAND |wx .ALL ,8 )
-		mainSizer .Add (navSizer ,0 ,wx .EXPAND )
+		mainSizer .Add (navSizer ,3 ,wx .EXPAND )
 
 		self .txtLeitura =wx .TextCtrl (
 		mainPanel ,
@@ -580,17 +699,17 @@ class BibliaFrame (wx .Frame ):
 		self ._versosSelecionados =[]
 
 		self .Bind (wx .EVT_CHAR_HOOK ,self .onChar )
-		self .lista .Bind (wx .EVT_LISTBOX_DCLICK ,lambda e :self .abrir ())
-		self .lista .Bind (wx .EVT_KEY_DOWN ,self .onKeyDown )
-
-		self .lista .Bind (wx .EVT_LISTBOX ,self ._onListSelectionChanged )
-		try :
-			self .lista .Bind (wx .EVT_CHAR_HOOK ,self .onChar )
-		except Exception :
-			pass 
+		self ._listaCtrl .Bind (wx .EVT_LIST_ITEM_ACTIVATED ,lambda e :self .abrir ())
+		self ._listaCtrl .Bind (wx .EVT_KEY_DOWN ,self .onKeyDown )
+		self ._listaCtrl .Bind (wx .EVT_LIST_ITEM_SELECTED ,self ._onListSelectionChanged )
+		self ._listaBox .Bind (wx .EVT_LISTBOX_DCLICK ,lambda e :self .abrir ())
+		self ._listaBox .Bind (wx .EVT_KEY_DOWN ,self .onKeyDown )
+		self ._listaBox .Bind (wx .EVT_LISTBOX ,self ._onListSelectionChanged )
 		self .Bind (wx .EVT_CLOSE ,self ._onCloseSaveLastPosition )
 
 		self .btnAnterior .Bind (wx .EVT_BUTTON ,lambda e :self .capituloAnterior ())
+		self .btnLivroAnterior .Bind (wx .EVT_BUTTON ,lambda e :self .livroAnterior ())
+		self .btnProximoLivro .Bind (wx .EVT_BUTTON ,lambda e :self .proximoLivro ())
 		self .btnMarcarLido .Bind (wx .EVT_BUTTON ,lambda e :self .toggleMarcarCapituloLido ())
 		self .btnProximo .Bind (wx .EVT_BUTTON ,lambda e :self .proximoCapitulo ())
 		self .btnCopiar .Bind (wx .EVT_BUTTON ,lambda e :self ._copyMarkedOrSelected ())
@@ -833,14 +952,26 @@ class BibliaFrame (wx .Frame ):
 			self .lblContexto .SetForegroundColour (fg )
 			self .lblContexto .SetBackgroundColour (bg )
 
-			self .lista .SetBackgroundColour (acc )
-			self .lista .SetForegroundColour (fg )
+			self ._listaCtrl .SetBackgroundColour (acc )
+			self ._listaCtrl .SetForegroundColour (fg )
+			self ._listaBox .SetBackgroundColour (acc )
+			self ._listaBox .SetForegroundColour (fg )
 
 			self .txtLeitura .SetBackgroundColour (bg )
 			self .txtLeitura .SetForegroundColour (fg )
 			self .Refresh ()
 		except Exception :
 			pass 
+
+	def _trocarLista (self ,usarListBox ):
+		novo =self ._listaBox if usarListBox else self ._listaCtrl 
+		antigo =self ._listaCtrl if usarListBox else self ._listaBox 
+		if self .lista is novo :
+			return 
+		self .lista =novo 
+		antigo .Hide ()
+		novo .Show ()
+		self ._navSizer .Layout ()
 
 	def _alternarTema (self ,checked ):
 		try :
@@ -859,6 +990,39 @@ class BibliaFrame (wx .Frame ):
 		except Exception :
 			pass 
 
+	def _onTxtUpdateTick (self ,event ):
+		if event .GetTimer ()is self ._txtUpdateTimer :
+			if self ._pendingBeepCap :
+				self ._pendingBeepCap =False 
+				if tones :
+					try :
+						tones .beep (350 ,5 )
+					except Exception :
+						pass 
+			if self ._pendingTxtVerso is not None :
+				try :
+					self .txtLeitura .Freeze ()
+					self .txtLeitura .SetValue (self ._pendingTxtVerso )
+					self .txtLeitura .ShowPosition (0 )
+					self .txtLeitura .Thaw ()
+				except Exception :
+					pass 
+				self ._pendingTxtVerso =None 
+		else :
+			event .Skip ()
+
+	def _onSavePositionTick (self ,event ):
+		if event .GetTimer ()is self ._savePositionTimer :
+			try :
+				livro =self .livroAtual 
+				capitulo =self .capituloAtual 
+				if livro and capitulo :
+					self .configManager .set_last_position (self .versaoAtual ,livro ,capitulo )
+			except Exception :
+				pass 
+		else :
+			event .Skip ()
+
 	def _buildNotesIndex (self ):
 		self .indexNotasPorLivro .clear ()
 		self .indexNotasPorLivro =defaultdict (list )
@@ -870,6 +1034,7 @@ class BibliaFrame (wx .Frame ):
 		try :
 			if self .lista .GetCount ()>0 and self .lista .GetSelection ()==wx .NOT_FOUND :
 				self .lista .SetSelection (0 )
+				self .lista .EnsureVisible (0 )
 			self .lista .SetFocus ()
 		except Exception :
 			pass 
@@ -959,6 +1124,7 @@ class BibliaFrame (wx .Frame ):
 		("Ctrl++","Aumentar fonte"),
 		("Ctrl+-","Diminuir fonte"),
 		("F1","Abrir esta ajuda rápida"),
+		("F5","Ir para capítulo ou versículo por número"),
 		]
 
 		for i ,(a ,f )in enumerate (atalhos ):
@@ -1038,6 +1204,12 @@ class BibliaFrame (wx .Frame ):
 			pass 
 		try :
 			self ._pararLeituraSeAtiva ()
+			for t in (getattr (self ,'_txtUpdateTimer',None ),getattr (self ,'_savePositionTimer',None )):
+				try :
+					if t and t .IsRunning ():
+						t .Stop ()
+				except Exception :
+					pass 
 			livro =self .livroAtual or getattr (self ,"_lastVisitedBook",None )
 			capitulo =self .capituloAtual or getattr (self ,"_lastVisitedChapter",None )
 			if livro and capitulo :
@@ -1236,8 +1408,8 @@ class BibliaFrame (wx .Frame ):
 
 	def _updateVisibleButtons (self ,visible_buttons ):
 		all_buttons =[
-		self .btnAnterior ,self .btnMarcarLido ,self .btnProximo ,self .btnCopiar ,
-		self .btnAdicionarNota ,self .btnRemoverNota ,self .btnBuscar ,
+		self .btnLivroAnterior ,self .btnAnterior ,self .btnMarcarLido ,self .btnProximo ,self .btnProximoLivro ,
+		self .btnCopiar ,self .btnAdicionarNota ,self .btnRemoverNota ,self .btnBuscar ,
 		self .btnFavoritos ,self .btnPagAnterior ,self .btnPagProxima ,
 		self .btnLimparBusca 
 		]
@@ -1254,6 +1426,7 @@ class BibliaFrame (wx .Frame ):
 		self ._pararLeituraSeAtiva ()
 		self ._navigationStack .clear ()
 		self .nivel ="livros"
+		self ._trocarLista (usarListBox =False )
 		self .livroAtual =None 
 		self .capituloAtual =None 
 		self ._limparSelecao ()
@@ -1302,6 +1475,7 @@ class BibliaFrame (wx .Frame ):
 	def mostrarCapitulos (self ,livro ):
 		self ._pararLeituraSeAtiva ()
 		self .nivel ="capitulos"
+		self ._trocarLista (usarListBox =True )
 		self ._limparSelecao ()
 		self ._resetMarksForLevel ()
 		self .livroAtual =livro 
@@ -1384,6 +1558,7 @@ class BibliaFrame (wx .Frame ):
 	def mostrarVersiculos (self ,livro ,capitulo ):
 		self ._pararLeituraSeAtiva ()
 		self .nivel ="versiculos"
+		self ._trocarLista (usarListBox =True )
 		self ._resetMarksForLevel ()
 		self .livroAtual =livro 
 		self .capituloAtual =capitulo 
@@ -1391,7 +1566,9 @@ class BibliaFrame (wx .Frame ):
 		try :
 			self ._lastVisitedBook =livro 
 			self ._lastVisitedChapter =capitulo 
-			self .configManager .set_last_position (self .versaoAtual ,livro ,capitulo )
+			if self ._savePositionTimer .IsRunning ():
+				self ._savePositionTimer .Stop ()
+			self ._savePositionTimer .Start (800 ,oneShot =True )
 		except Exception :
 			pass 
 
@@ -1648,23 +1825,65 @@ class BibliaFrame (wx .Frame ):
 
 	def capituloAnterior (self ):
 		self ._pararLeituraSeAtiva ()
-		if self .nivel =="versiculos"and self .capituloAtual is not None :
-			if self .capitulos and self .capituloAtual in self .capitulos :
+		if self .nivel =="versiculos"and self .capituloAtual is not None and self .capitulos :
+			try :
 				idx =self .capitulos .index (self .capituloAtual )
 				if idx >0 :
 					novoCap =self .capitulos [idx -1 ]
 					self ._ultimoCapituloSelecionado =novoCap 
 					self .mostrarVersiculos (self .livroAtual ,novoCap )
+			except (ValueError ,Exception ):
+				pass 
 
 	def proximoCapitulo (self ):
 		self ._pararLeituraSeAtiva ()
-		if self .nivel =="versiculos"and self .capituloAtual is not None :
-			if self .capitulos and self .capituloAtual in self .capitulos :
+		if self .nivel =="versiculos"and self .capituloAtual is not None and self .capitulos :
+			try :
 				idx =self .capitulos .index (self .capituloAtual )
 				if idx <len (self .capitulos )-1 :
 					novoCap =self .capitulos [idx +1 ]
 					self ._ultimoCapituloSelecionado =novoCap 
 					self .mostrarVersiculos (self .livroAtual ,novoCap )
+			except (ValueError ,Exception ):
+				pass 
+
+	def livroAnterior (self ):
+		self ._pararLeituraSeAtiva ()
+		if self .nivel !="versiculos"or not self .livroAtual :
+			return 
+		livrosSiglas =[s for s in NOMES_LIVROS if self .bibleManager .bible_tree .get (s )]
+		try :
+			idx =livrosSiglas .index (self .livroAtual )
+			if idx >0 :
+				novoLivro =livrosSiglas [idx -1 ]
+				caps =sorted (self .bibleManager .bible_tree [novoLivro ].keys ())
+				ultimoCap =caps [-1 ]
+				self ._ultimoLivroSelecionado =novoLivro 
+				self ._ultimoCapituloSelecionado =ultimoCap 
+				self .mostrarVersiculos (novoLivro ,ultimoCap )
+				nomeLivro =NOMES_LIVROS .get (novoLivro ,novoLivro )
+				self .anunciar (f"{nomeLivro}, capítulo {ultimoCap}")
+		except (ValueError ,Exception ):
+			pass 
+
+	def proximoLivro (self ):
+		self ._pararLeituraSeAtiva ()
+		if self .nivel !="versiculos"or not self .livroAtual :
+			return 
+		livrosSiglas =[s for s in NOMES_LIVROS if self .bibleManager .bible_tree .get (s )]
+		try :
+			idx =livrosSiglas .index (self .livroAtual )
+			if idx <len (livrosSiglas )-1 :
+				novoLivro =livrosSiglas [idx +1 ]
+				caps =sorted (self .bibleManager .bible_tree [novoLivro ].keys ())
+				primeiroCap =caps [0 ]
+				self ._ultimoLivroSelecionado =novoLivro 
+				self ._ultimoCapituloSelecionado =primeiroCap 
+				self .mostrarVersiculos (novoLivro ,primeiroCap )
+				nomeLivro =NOMES_LIVROS .get (novoLivro ,novoLivro )
+				self .anunciar (f"{nomeLivro}, capítulo {primeiroCap}")
+		except (ValueError ,Exception ):
+			pass 
 
 	def _calcIntervalo (self ,texto :str )->int :
 		base =250 
@@ -1883,44 +2102,36 @@ class BibliaFrame (wx .Frame ):
 				pass 
 			return False 
 
-		def tentarWin32Clipboard ():
-			maxTentativas =8 
-			for _ in range (maxTentativas ):
-				try :
-					if win32clipboard and win32con :
-						win32clipboard .OpenClipboard (hwndOwner )
+		def tentarWin32UmaVez ():
+			try :
+				if win32clipboard and win32con :
+					win32clipboard .OpenClipboard (hwndOwner )
+					try :
+						win32clipboard .EmptyClipboard ()
+						win32clipboard .SetClipboardData (win32con .CF_UNICODETEXT ,textoSeg )
+						win32clipboard .CloseClipboard ()
+						wx .CallLater (10 ,finalizar ,True )
+						return True 
+					except Exception :
 						try :
-							win32clipboard .EmptyClipboard ()
-							win32clipboard .SetClipboardData (win32con .CF_UNICODETEXT ,textoSeg )
-							try :
-								win32clipboard .CloseClipboard ()
-							except Exception :
-								pass 
-							wx .CallLater (10 ,finalizar ,True )
-							return True 
-						finally :
-							try :
-								win32clipboard .CloseClipboard ()
-							except Exception :
-								pass 
-					else :
-						break 
-				except Exception :
-					try :
-						wx .Yield ()
-					except Exception :
-						pass 
-					try :
-						wx .MilliSleep (20 )
-					except Exception :
-						pass 
+							win32clipboard .CloseClipboard ()
+						except Exception :
+							pass 
+			except Exception :
+				pass 
 			return False 
+
+		def tentarWin32ComRetentativa (tentativa =0 ,maxTentativas =8 ):
+			if tentarWin32UmaVez ():
+				return 
+			if tentativa <maxTentativas -1 :
+				wx .CallLater (25 ,tentarWin32ComRetentativa ,tentativa +1 ,maxTentativas )
+			else :
+				wx .CallLater (10 ,finalizar ,False )
 
 		if tentarWxClipboard ():
 			return 
-		if tentarWin32Clipboard ():
-			return 
-		wx .CallLater (10 ,finalizar ,False )
+		tentarWin32ComRetentativa ()
 
 	def _copyMarkedOrSelected (self ):
 		textoCopiar =""
@@ -2198,7 +2409,7 @@ class BibliaFrame (wx .Frame ):
 
 			dlg .Destroy ()
 
-			wx .Yield ()
+			wx .SafeYield ()
 
 			if res ==wx .ID_OK :
 				filtroLivroKey =None 
@@ -2256,6 +2467,50 @@ class BibliaFrame (wx .Frame ):
 			except Exception :
 				pass 
 			if ui :ui .message ("Não é possível pesquisar nesta versão.")
+
+	def irParaNumero (self ):
+		if self .nivel not in ("capitulos","versiculos"):
+			self .anunciar ("Disponível apenas na lista de capítulos ou versículos.")
+			return 
+
+		if self .nivel =="capitulos":
+			caps =self .capitulos 
+			nomeLivro =NOMES_LIVROS .get (self .livroAtual ,self .livroAtual )
+			prompt =f"{nomeLivro} — Digite o número do capítulo (1–{caps[-1]}):"
+		else :
+			numVersos =len (self ._versosLista )
+			nomeLivro =NOMES_LIVROS .get (self .livroAtual ,self .livroAtual )
+			prompt =f"{nomeLivro} {self.capituloAtual} — Digite o número do versículo (1–{numVersos}):"
+
+		dlg =wx .TextEntryDialog (self ,prompt ,"Ir para número")
+		self ._bind_global_shortcuts_to_dialog (dlg )
+		if dlg .ShowModal ()==wx .ID_OK :
+			texto =dlg .GetValue ().strip ()
+			dlg .Destroy ()
+			if not texto .isdigit ():
+				return 
+			num =int (texto )
+			if self .nivel =="capitulos":
+				if num in caps :
+					idx =caps .index (num )
+					self .lista .SetSelection (idx )
+					self .lista .EnsureVisible (idx )
+					self .lista .SetFocus ()
+				else :
+					self .anunciar (f"Capítulo {num} não encontrado.")
+			else :
+				versos =[v ["versiculo"]for v in self ._versosLista ]
+				if num in versos :
+					idx =versos .index (num )
+					self .lista .SetSelection (idx )
+					self .lista .EnsureVisible (idx )
+					self .lista .SetFocus ()
+					v_obj =self ._versosLista [idx ]
+					self .anunciar (f"{v_obj['versiculo']}: {v_obj['texto']}")
+				else :
+					self .anunciar (f"Versículo {num} não encontrado.")
+		else :
+			dlg .Destroy ()
 
 	def irParaReferencia (self ):
 		self ._pararLeituraSeAtiva ()
@@ -2341,6 +2596,7 @@ class BibliaFrame (wx .Frame ):
 	def mostrarResultadosBusca (self ):
 		self ._pararLeituraSeAtiva ()
 		self .nivel ="busca"
+		self ._trocarLista (usarListBox =True )
 		self ._resetMarksForLevel ()
 		self .lista .Freeze ()
 		self .lista .Clear ()
@@ -2486,8 +2742,8 @@ class BibliaFrame (wx .Frame ):
 
 	def mostrarFavoritos (self ):
 		self ._pararLeituraSeAtiva ()
-
 		self .nivel ="favoritos"
+		self ._trocarLista (usarListBox =True )
 		self ._resetMarksForLevel ()
 		self .lista .Freeze ()
 		self .lista .Clear ()
@@ -2534,8 +2790,8 @@ class BibliaFrame (wx .Frame ):
 
 	def mostrarCapitulosLidos (self ):
 		self ._pararLeituraSeAtiva ()
-
 		self .nivel ="lidos"
+		self ._trocarLista (usarListBox =True )
 		self ._resetMarksForLevel ()
 
 		self .lidosLista =self .readManager .all ()
@@ -2608,28 +2864,32 @@ class BibliaFrame (wx .Frame ):
 				self .mostrarCapitulosLidos ()
 
 	def _check_boundary_beep (self ,list_ctrl ,key_code ):
-		if not tones :return 
-		sel =list_ctrl .GetSelection ()
-		if sel ==wx .NOT_FOUND :return 
-
-		if key_code ==wx .WXK_UP :
-			if sel ==0 :
-				tones .beep (880 ,20 )
-		elif key_code ==wx .WXK_DOWN :
-			if sel ==list_ctrl .GetCount ()-1 :
-				tones .beep (440 ,20 )
+		try :
+			if not tones :return False 
+			sel =list_ctrl .GetSelection ()
+			if sel ==wx .NOT_FOUND :return False 
+			if key_code ==wx .WXK_UP and sel ==0 :
+				tones .beep (600 ,15 )
+				return True 
+			if key_code ==wx .WXK_DOWN and sel ==list_ctrl .GetCount ()-1 :
+				tones .beep (400 ,15 )
+				return True 
+		except Exception :
+			pass 
+		return False 
 
 	def onKeyDown (self ,event ):
 		keyCode =event .GetKeyCode ()
 		ctrl =event .ControlDown ()
 		shift =event .ShiftDown ()
 		alt =event .AltDown ()
-
-
 		no_modifiers =not ctrl and not shift and not alt 
 
 		if keyCode in (wx .WXK_UP ,wx .WXK_DOWN )and no_modifiers :
-			self ._check_boundary_beep (self .lista ,keyCode )
+			if self ._check_boundary_beep (self .lista ,keyCode ):
+				return 
+			event .Skip ()
+			return 
 
 		if self .nivel =="busca":
 			if keyCode ==wx .WXK_PAGEUP and no_modifiers :
@@ -2648,8 +2908,7 @@ class BibliaFrame (wx .Frame ):
 				self .paginaLidosAnterior ();return 
 			if keyCode ==wx .WXK_PAGEDOWN and no_modifiers :
 				self .paginaLidosProxima ();return 
-		if keyCode in (wx .WXK_UP ,wx .WXK_DOWN ):
-			event .Skip ();return 
+
 		event .Skip ()
 
 	def onChar (self ,event ):
@@ -2666,6 +2925,8 @@ class BibliaFrame (wx .Frame ):
 			self .voltar ();return 
 		if keyCode ==wx .WXK_F1 :
 			self .mostrarAjudaRapida ();return 
+		if keyCode ==wx .WXK_F5 :
+			self .irParaNumero ();return 
 
 
 		if keyCode in (wx .WXK_RETURN ,wx .WXK_NUMPAD_ENTER ):
@@ -2700,9 +2961,17 @@ class BibliaFrame (wx .Frame ):
 
 
 		if keyCode ==wx .WXK_LEFT and not alt and not ctrl and not shift and self .nivel =="versiculos":
-			self .capituloAnterior ();return 
+			if self .capitulos and self .capituloAtual ==self .capitulos [0 ]:
+				wx .CallAfter (self .livroAnterior )
+			else :
+				wx .CallAfter (self .capituloAnterior )
+			return 
 		if keyCode ==wx .WXK_RIGHT and not alt and not ctrl and not shift and self .nivel =="versiculos":
-			self .proximoCapitulo ();return 
+			if self .capitulos and self .capituloAtual ==self .capitulos [-1 ]:
+				wx .CallAfter (self .proximoLivro )
+			else :
+				wx .CallAfter (self .proximoCapitulo )
+			return 
 
 		if ctrl and not shift and not alt and keyCode ==ord ('N'):
 			self .adicionarNota ();return 
@@ -2791,11 +3060,11 @@ class BibliaFrame (wx .Frame ):
 				v =self ._versosLista [idx ]
 				try :
 					self ._atualizarContexto ()
-					self .txtLeitura .Freeze ()
-					self .txtLeitura .SetValue (f"{v['versiculo']}: {v['texto']}")
-					self .txtLeitura .ShowPosition (0 )
-					self .txtLeitura .Thaw ()
-
+					novoTexto =f"{v['versiculo']}: {v['texto']}"
+					self ._pendingTxtVerso =novoTexto 
+					if self ._txtUpdateTimer .IsRunning ():
+						self ._txtUpdateTimer .Stop ()
+					self ._txtUpdateTimer .Start (80 ,oneShot =True )
 					if not self .leituraAtiva :
 						self .leituraIndice =idx 
 				except Exception :
@@ -2805,10 +3074,11 @@ class BibliaFrame (wx .Frame ):
 			idx =self .lista .GetSelection ()
 			if idx !=wx .NOT_FOUND :
 				try :
-					self .txtLeitura .Freeze ()
-					self .txtLeitura .SetValue (self ._strip_prefix (self .lista .GetString (idx )))
-					self .txtLeitura .ShowPosition (0 )
-					self .txtLeitura .Thaw ()
+					novoTexto =self ._strip_prefix (self .lista .GetString (idx ))
+					self ._pendingTxtVerso =novoTexto 
+					if self ._txtUpdateTimer .IsRunning ():
+						self ._txtUpdateTimer .Stop ()
+					self ._txtUpdateTimer .Start (80 ,oneShot =True )
 				except Exception :
 					pass 
 		elif self .nivel =="capitulos":
@@ -2819,7 +3089,11 @@ class BibliaFrame (wx .Frame ):
 					cap =int (capStr )
 					if self .readManager .is_read (self .livroAtual ,cap ):
 						if tones :
-							tones .beep (350 ,5 )
+							if self ._txtUpdateTimer .IsRunning ():
+								self ._txtUpdateTimer .Stop ()
+							self ._pendingTxtVerso =None 
+							self ._txtUpdateTimer .Start (60 ,oneShot =True )
+							self ._pendingBeepCap =True 
 				except Exception :
 					pass 
 		event .Skip ()
@@ -2851,7 +3125,8 @@ class BibliaFrame (wx .Frame ):
 		clb =wx .CheckListBox (dlg ,choices =todas ,style =wx .LB_SINGLE ,name ="Lista de versões")
 
 		def _on_clb_key (event ):
-			self ._check_boundary_beep (clb ,event .GetKeyCode ())
+			if self ._check_boundary_beep (clb ,event .GetKeyCode ()):
+				return 
 			event .Skip ()
 		clb .Bind (wx .EVT_KEY_DOWN ,_on_clb_key )
 
@@ -2927,15 +3202,24 @@ class BibliaFrame (wx .Frame ):
 			def safe_compare (a ,b ):
 				return str (a ).strip ().lower ()==str (b ).strip ().lower ()
 
+			if ui :ui .message ("Comparando versões, aguarde...")
 			for versao in selecionadas :
 				try :
-					bib =self .bibleManager .carregar_para_leitura (versao )
+					bib_tree =self .bibleManager .bible_tree if versao ==self .versaoAtual else None 
 					texto =None 
-					for v in bib :
-						if (safe_compare (v .get ("livro"),livro )or 
-						(v .get ("livro","").strip ().lower ()==NOMES_LIVROS .get (livro ,"").lower ()))and safe_compare (v .get ("capitulo"),cap )and safe_compare (v .get ("versiculo"),vers ):
-							texto =v .get ("texto")
-							break 
+					if bib_tree is not None :
+						versos_cap =bib_tree .get (livro ,{}).get (cap ,[])
+						for v in versos_cap :
+							if safe_compare (v .get ("versiculo"),vers ):
+								texto =v .get ("texto")
+								break 
+					else :
+						bib =self .bibleManager .carregar_para_leitura (versao )
+						for v in bib :
+							if (safe_compare (v .get ("livro"),livro )or 
+							(v .get ("livro","").strip ().lower ()==NOMES_LIVROS .get (livro ,"").lower ()))and safe_compare (v .get ("capitulo"),cap )and safe_compare (v .get ("versiculo"),vers ):
+								texto =v .get ("texto")
+								break 
 					compEntries .append ({"versao":versao ,"texto":texto })
 				except Exception :
 					compEntries .append ({"versao":versao ,"texto":None })
@@ -2956,7 +3240,8 @@ class BibliaFrame (wx .Frame ):
 			lb =wx .ListBox (resDlg ,choices =linhas ,style =wx .LB_SINGLE ,name ="Versículos comparados")
 
 			def _on_lb_key (event ):
-				self ._check_boundary_beep (lb ,event .GetKeyCode ())
+				if self ._check_boundary_beep (lb ,event .GetKeyCode ()):
+					return 
 				event .Skip ()
 			lb .Bind (wx .EVT_KEY_DOWN ,_on_lb_key )
 
@@ -3118,6 +3403,13 @@ class BibliaFrame (wx .Frame ):
 
 	def _updateButtonsForChapter (self ):
 		idx =self .capitulos .index (self .capituloAtual )if (self .capitulos and self .capituloAtual in self .capitulos )else -1 
+		livrosSiglas =[s for s in NOMES_LIVROS if self .bibleManager .bible_tree .get (s )]
+		idxLivro =livrosSiglas .index (self .livroAtual )if self .livroAtual in livrosSiglas else -1 
+		primeiroCapitulo =(idx ==0 )
+		ultimoCapitulo =(idx ==-1 or idx ==len (self .capitulos )-1 )
+		temLivroAnterior =(idxLivro >0 )
+		temProximoLivro =(idxLivro !=-1 and idxLivro <len (livrosSiglas )-1 )
+
 		if idx >0 :self .btnAnterior .Enable ()
 		else :self .btnAnterior .Disable ()
 		if idx !=-1 and idx <len (self .capitulos )-1 :self .btnProximo .Enable ()
@@ -3131,10 +3423,15 @@ class BibliaFrame (wx .Frame ):
 		self .btnBuscar .Enable ()
 		self .btnFavoritos .Enable ()
 
-		self ._updateVisibleButtons ([
+		botoesVisiveis =[
 		self .btnAnterior ,self .btnProximo ,self .btnMarcarLido ,
 		self .btnCopiar ,self .btnAdicionarNota ,self .btnRemoverNota 
-		])
+		]
+		if primeiroCapitulo and temLivroAnterior :
+			botoesVisiveis .insert (0 ,self .btnLivroAnterior )
+		if ultimoCapitulo and temProximoLivro :
+			botoesVisiveis .append (self .btnProximoLivro )
+		self ._updateVisibleButtons (botoesVisiveis )
 
 	def _updateButtonsForSearch (self ):
 		self .btnAnterior .Disable ()
@@ -3335,6 +3632,12 @@ class GlobalPlugin (globalPluginHandler .GlobalPlugin ):
 			if self ._frame :
 				if self ._frame .leituraTimer .IsRunning ():
 					self ._frame .leituraTimer .Stop ()
+				for t in (getattr (self ._frame ,'_txtUpdateTimer',None ),getattr (self ._frame ,'_savePositionTimer',None )):
+					try :
+						if t and t .IsRunning ():
+							t .Stop ()
+					except Exception :
+						pass 
 				if self ._frame .IsShown ():
 					self ._frame .Destroy ()
 		except Exception :

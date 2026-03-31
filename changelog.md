@@ -1,5 +1,17 @@
 # Changelog
 
-## 2026.03.12
-- Quinta versão publicada.
-- Melhorias desta versão: navegação fluida, cópia confiável de versículos e verificação instantânea de capítulos lidos.
+## 2026.04.01
+
+
+
+Sexta versão publicada.
+
+Melhorias desta versão: 
+
+* navegação entre livros sem voltar ao índice, 
+* bips de limite mais discretos, 
+* ir direto a capítulo ou versículo com F5 
+* lista de livros sem travamentos.
+
+
+
