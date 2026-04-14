@@ -4,39 +4,92 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" type="text/css" href="../style.css" media="screen">
-<title>Open Bible 2026.04.01</title>
+<title>Open Bible 2026.04.14</title>
 </head>
 <body>
 <h1>Open Bible (NVDA Add-on)</h1>
-<p>Add-on do <strong>NVDA</strong> para leitura da Bíblia Sagrada em várias versões (arquivos JSON), com navegação por <strong>livro → capítulo → versículo</strong>, pesquisa e recursos de produtividade.</p>
+<p>Add-on do <strong>NVDA</strong> para leitura da Bíblia Sagrada totalmente acessível, com suporte a múltiplas versões (arquivos <code>.json</code>), navegação por livro, capítulo e versículo, pesquisa, favoritos, anotações e muito mais.</p>
+<p><strong>Atalho para abrir:</strong> <code>Ctrl+Alt+B</code></p>
+<h2>Instalação</h2>
+<ol>
+<li>Baixe o arquivo <code>.nvda-addon</code> na página de <a href="https://github.com/leandro-sds/Open_Bible/releases">releases do GitHub</a>.</li>
+<li>Abra o arquivo e confirme a instalação no NVDA.</li>
+<li>Reinicie o NVDA se solicitado.</li>
+<li>Pressione <code>Ctrl+Alt+B</code> para abrir o Open Bible.</li>
+<li>Na primeira abertura sem Bíblia instalada, o addon perguntará se deseja abrir o Google Drive para baixar os arquivos. Após baixar, use <code>Ctrl+G</code> para importar o arquivo <code>.json</code>.</li>
+</ol>
+<h2>Adicionar versões da Bíblia</h2>
+<p>O Open Bible usa arquivos <code>.json</code> como fonte de dados. Para adicionar uma versão:</p>
+<ol>
+<li>Abra o Open Bible (<code>Ctrl+Alt+B</code>).</li>
+<li>Pressione <code>Ctrl+G</code> para abrir o Gerenciador de Bíblias.</li>
+<li>Clique em <strong>Importar JSON</strong> e selecione o arquivo baixado.</li>
+<li>A versão será carregada automaticamente.</li>
+</ol>
+<p>Arquivos disponíveis para download: <a href="https://drive.google.com/drive/folders/1THS2L9GiCx_rWWCJ23JGh3Ws7qVup0uE?usp=sharing">Google Drive – Bíblias Open Bible</a></p>
+<p>Exemplos de nomes de arquivo: <code>01_ACF.json</code>, <code>02_NVI.json</code>.</p>
+<h2>Navegação</h2>
+<p>A navegação segue a hierarquia: <strong>Livros → Capítulos → Versículos</strong>.</p>
 <ul>
-<li><strong>Atalho principal:</strong> <code>Ctrl+Alt+B</code> (abre a janela do Open Bible)</li>
+<li>Use as <strong>setas</strong> para mover entre itens da lista.</li>
+<li>Pressione <strong>Enter</strong> ou <strong>duplo clique</strong> para abrir o item selecionado.</li>
+<li>Pressione <strong>Esc</strong> para voltar ao nível anterior.</li>
+<li>Use <strong>Esquerda</strong> e <strong>Direita</strong> para navegar entre capítulos (e entre livros ao chegar no primeiro ou último capítulo).</li>
 </ul>
 <h2>Recursos</h2>
 <ul>
-<li>Seleção de <strong>versões</strong> (arquivos <code>.json</code>) e gerenciamento das versões instaladas</li>
-<li>Navegação rápida por livro, capítulo e versículo</li>
-<li><strong>Pesquisa</strong> de texto</li>
-<li><strong>Favoritos</strong> e <strong>anotações</strong></li>
-<li><strong>Copiar/compartilhar</strong> versículos (área de transferência do Windows)</li>
+<li><strong>Múltiplas versões:</strong> carregue e alterne entre versões da Bíblia.</li>
+<li><strong>Pesquisa:</strong> busca por palavra ou frase em toda a Bíblia ou em um livro específico, com opção de palavra inteira e ignorar acentos.</li>
+<li><strong>Ir para referência:</strong> navegue diretamente para qualquer referência bíblica (ex.: Jo 3:16).</li>
+<li><strong>Ir para número (F5):</strong> vá diretamente a um capítulo ou versículo pelo número, com mensagem de erro se o número não existir.</li>
+<li><strong>Favoritos:</strong> adicione, liste e remova versículos favoritos, com paginação.</li>
+<li><strong>Anotações:</strong> adicione notas a capítulos ou versículos específicos.</li>
+<li><strong>Copiar versículos:</strong> copie o versículo atual, uma seleção múltipla ou resultados de busca para a área de transferência.</li>
+<li><strong>Seleção múltipla:</strong> marque vários versículos com Espaço e copie todos de uma vez.</li>
+<li><strong>Leitura contínua:</strong> leitura automática sequencial do capítulo (<code>Ctrl+L</code>).</li>
+<li><strong>Comparar versões:</strong> compare um versículo entre diferentes versões da Bíblia lado a lado (<code>Ctrl+Shift+C</code>).</li>
+<li><strong>Histórico de leitura:</strong> marque capítulos como lidos e consulte o histórico (<code>Ctrl+M</code> / <code>Ctrl+Shift+M</code>).</li>
+<li><strong>Versículo ao iniciar:</strong> leitura automática de um favorito aleatório ao iniciar o NVDA (configurável em Exibição).</li>
+<li><strong>Tema escuro/claro:</strong> alternância visual pelo menu Exibição.</li>
+<li><strong>Ajuste de fonte:</strong> <code>Ctrl++</code> e <code>Ctrl+-</code>.</li>
+<li><strong>Backup e restauração:</strong> salve e restaure configurações, favoritos, notas e histórico em ZIP (<code>Ctrl+B</code>).</li>
+<li><strong>Gerenciador de Bíblias:</strong> importe, remova e defina a versão padrão (<code>Ctrl+G</code>).</li>
 </ul>
-<h2>Pasta <code>biblias/</code> (Incluída neste ZIP)</h2>
-<p>Por padrão, o add-on procura as versões em <code>addon/biblias/</code> (sem acento).  </p>
-<p>Exemplos de nomes de arquivo:
-- <code>01_ACF.json</code>
-- <code>02_NVI.json</code></p>
-<h2>Instalação (usuário final)</h2>
-<ol>
-<li>Baixe o arquivo <code>*.nvda-addon</code> na página de releases do GitHub.</li>
-<li>Abra o arquivo e confirme a instalação no NVDA.</li>
-<li>Reinicie o NVDA se solicitado.</li>
-<li>Use <code>Ctrl+Alt+B</code> para abrir o Open Bible.</li>
-</ol>
-<h2>Desenvolvimento / Compilação do add-on</h2>
-<p>Este repositório usa o template oficial com <strong>SCons</strong>.</p>
+<h2>Atalhos</h2>
+<p>| Atalho | Função |
+|---|---|
+| Ctrl+Alt+B | Abrir o Open Bible |
+| Esc | Voltar ao nível anterior |
+| Enter | Abrir item / ouvir versículo |
+| Espaço | Marcar/desmarcar versículo |
+| Ctrl+A | Marcar todos os versículos |
+| Ctrl+Z | Limpar seleção |
+| Ctrl+C | Copiar versículo(s) |
+| Ctrl+E | Editor de versículo (somente leitura) |
+| Ctrl+I | Índice de livros |
+| Ctrl+L | Iniciar/Parar leitura contínua |
+| Esquerda / Direita | Capítulo anterior / próximo (e livro anterior/próximo nos extremos) |
+| Ctrl+Shift+C | Comparar versículo entre versões |
+| PageUp / PageDown | Página anterior / próxima (busca, favoritos e lidos) |
+| F5 | Ir para capítulo ou versículo por número |
+| F1 | Ajuda rápida com todos os atalhos |
+| Ctrl+P | Pesquisar na Bíblia |
+| Ctrl+R | Ir para referência (ex.: Jo 3:16) |
+| Ctrl+N | Adicionar nota |
+| Ctrl+Del | Remover nota selecionada |
+| Ctrl+F | Adicionar favorito |
+| Ctrl+Shift+F | Abrir lista de favoritos |
+| Ctrl+M | Marcar/desmarcar capítulo como lido |
+| Ctrl+Shift+M | Listar capítulos lidos |
+| Ctrl+T | Alternar para a próxima versão (cíclico) |
+| Ctrl+G | Gerenciar Bíblias |
+| Ctrl+B | Backup e restauração |
+| Ctrl++ / Ctrl+- | Aumentar / diminuir fonte da área de leitura |
+| Alt+F4 | Fechar o Open Bible |</p>
 <h2>Licença</h2>
-<p>Este projeto é distribuído sob a <strong>GPL v2</strong> (veja <code>COPYING.txt</code>).</p>
+<p>Distribuído sob a <strong>GPL v2</strong> (veja <code>COPYING.txt</code>).</p>
 <h2>Créditos</h2>
-<p>Desenvolvido por <strong>Leandro Souza</strong>.</p>
+<p>Desenvolvido por <strong>Leandro Souza</strong>.<br />
+GitHub: <a href="https://github.com/leandro-sds/Open_Bible/">github.com/leandro-sds/Open_Bible</a></p>
 </body>
 </html>

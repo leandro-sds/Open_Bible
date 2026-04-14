@@ -23,25 +23,28 @@ addon_info = AddonInfo(
 	# Translators: Long description to be shown for this add-on on add-on information from add-on store
 	addon_description=_(
 		"""Este add-on permite a leitura da Bíblia Sagrada no NVDA em várias versões (arquivos JSON).
-		Você pode navegar por livro, capítulo e versículo, pesquisar, favoritar, anotar e copiar/compartilhar versículos."""
+		Você pode navegar por livro, capítulo e versículo, pesquisar, favoritar, anotar, copiar versículos,
+		comparar versões, marcar capítulos como lidos, gerenciar favoritos e anotações, e muito mais."""
 	),
 	# version
-	addon_version="2026.04.01",
+	addon_version="2026.04.14",
 	# Brief changelog for this version
 	# Translators: what's new content for the add-on version to be shown in the add-on store
 	addon_changelog=_(
 		"""Melhorias desta versão:
-navegação entre livros sem voltar ao índice,
-bips de limite mais discretos,
-ir direto a capítulo ou versículo com F5
-lista de livros sem travamentos."""
+correção de travamento do NVDA ao abrir sem Bíblia instalada,
+diálogo de primeira execução com opção de baixar Bíblias pelo Google Drive,
+carregamento automático da Bíblia ao importar pelo Gerenciador,
+mensagem de erro ao digitar capítulo ou versículo inexistente no F5,
+remoção de todos os bips do addon,
+limpeza geral do código."""
 	),
 	# Author(s)
 	addon_author="Leandro Souza",
 	# URL for the add-on documentation support
-	addon_url="https://github.com/leandro-sds/Open-Bible",
+	addon_url="https://github.com/leandro-sds/Open_Bible",
 	# URL for the add-on repository where the source code can be found
-	addon_sourceURL="https://github.com/leandro-sds/Open-Bible",
+	addon_sourceURL="https://github.com/leandro-sds/Open_Bible",
 	# Documentation file name
 	addon_docFileName="readme.html",
 	# Minimum NVDA version supported (e.g. "2019.3.0", minor version is optional)
