@@ -22,22 +22,17 @@ addon_info = AddonInfo(
 	# Add-on description
 	# Translators: Long description to be shown for this add-on on add-on information from add-on store
 	addon_description=_(
-		"""Este add-on permite a leitura da Bíblia Sagrada no NVDA em várias versões (arquivos JSON).
+		"""Bíblia de estudos para o leitor de telas NVDA.
 		Você pode navegar por livro, capítulo e versículo, pesquisar, favoritar, anotar, copiar versículos,
 		comparar versões, marcar capítulos como lidos, gerenciar favoritos e anotações, e muito mais."""
 	),
 	# version
-	addon_version="2026.04.14",
+	addon_version="2026.05.02",
 	# Brief changelog for this version
 	# Translators: what's new content for the add-on version to be shown in the add-on store
 	addon_changelog=_(
 		"""Melhorias desta versão:
-correção de travamento do NVDA ao abrir sem Bíblia instalada,
-diálogo de primeira execução com opção de baixar Bíblias pelo Google Drive,
-carregamento automático da Bíblia ao importar pelo Gerenciador,
-mensagem de erro ao digitar capítulo ou versículo inexistente no F5,
-remoção de todos os bips do addon,
-limpeza geral do código."""
+Compatibilidade com NVDA 2026.1"""
 	),
 	# Author(s)
 	addon_author="Leandro Souza",
@@ -50,7 +45,7 @@ limpeza geral do código."""
 	# Minimum NVDA version supported (e.g. "2019.3.0", minor version is optional)
 	addon_minimumNVDAVersion="2024.1",
 	# Last NVDA version supported/tested (e.g. "2024.4.0", ideally more recent than minimum version)
-	addon_lastTestedNVDAVersion="2025.3.3",
+	addon_lastTestedNVDAVersion="2026.1",
 	# Add-on update channel (default is None, denoting stable releases, and for development releases, use "dev".)
 	# Do not change unless you know what you are doing!
 	addon_updateChannel=None,

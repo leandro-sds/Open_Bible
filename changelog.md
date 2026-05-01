@@ -1,4 +1,16 @@
-# Changelog
+# \#Changelog
+
+
+
+## 2026.05.01
+
+Oitava versão publicada.
+
+Correções e melhorias desta versão:
+
+* Compatibilidade com nvda 2026.1
+
+
 
 ## 2026.04.14
 
@@ -24,3 +36,4 @@ Melhorias desta versão:
 * Bips de limite mais discretos.
 * Ir direto a capítulo ou versículo com F5.
 * Lista de livros sem travamentos.
+
