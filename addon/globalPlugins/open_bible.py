@@ -616,12 +616,10 @@ class BibliaFrame(wx.Frame):
 
 		navSizer = wx.BoxSizer(wx.HORIZONTAL)
 
-		self._listaCtrl = ListaWrapper(mainPanel, name="Lista de seleção")
 		self._listaBox = wx.ListBox(mainPanel, style=wx.LB_SINGLE | wx.LB_ALWAYS_SB, name="Lista de seleção")
-		self._listaBox.Hide()
-		self.lista = self._listaCtrl
+		self._listaCtrl = self._listaBox  # alias para compatibilidade
+		self.lista = self._listaBox
 		self._navSizer = navSizer
-		navSizer.Add(self._listaCtrl, 1, wx.EXPAND | wx.ALL, 8)
 		navSizer.Add(self._listaBox, 1, wx.EXPAND | wx.ALL, 8)
 
 		self.btnSizer = wx.BoxSizer(wx.VERTICAL)
@@ -682,9 +680,6 @@ class BibliaFrame(wx.Frame):
 		self._versosSelecionados = []
 
 		self.Bind(wx.EVT_CHAR_HOOK, self.onChar)
-		self._listaCtrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, lambda e: self.abrir())
-		self._listaCtrl.Bind(wx.EVT_KEY_DOWN, self.onKeyDown)
-		self._listaCtrl.Bind(wx.EVT_LIST_ITEM_SELECTED, self._onListSelectionChanged)
 		self._listaBox.Bind(wx.EVT_LISTBOX_DCLICK, lambda e: self.abrir())
 		self._listaBox.Bind(wx.EVT_KEY_DOWN, self.onKeyDown)
 		self._listaBox.Bind(wx.EVT_LISTBOX, self._onListSelectionChanged)
@@ -764,19 +759,18 @@ class BibliaFrame(wx.Frame):
 		wx.CallAfter(self._ensureListFocus)
 
 		if self.configManager.get_skip_continue_prompt():
-			wx.CallLater(200, self._sequenciaBoasVindasSeNecessario)
+			# Aguarda o NVDA terminar de ler o título "Open Bible – NomeDaVersão".
+			# Estimativa: 1200ms base + 60ms por caractere do nome da versão.
+			_titulo_len = len(self.versaoAtual) if self.versaoAtual else 0
+			_delay_inicio = 1200 + _titulo_len * 60
+			wx.CallLater(_delay_inicio, self._sequenciaBoasVindasSeNecessario)
 		else:
 			wx.CallAfter(self._promptContinuarLeituraSeExistir)
 
 	def _sequenciaBoasVindasSeNecessario(self):
-		if self._precisaBoasVindas and self.nivel == "livros":
-			try:
-				import speech as sp
-				sp.cancelSpeech()
-			except Exception:
-				pass
-			self.anunciar("Selecione um livro")
-			self._precisaBoasVindas = False
+		# Boas-vindas removidas: o NVDA já anuncia o título da janela
+		# e a lista de livros ao focar. Nada mais a fazer.
+		self._precisaBoasVindas = False
 
 	def abrirDialogoBackup(self, event):
 		self._pararLeituraSeAtiva()
@@ -914,8 +908,6 @@ class BibliaFrame(wx.Frame):
 			self.SetBackgroundColour(bg)
 			self.lblContexto.SetForegroundColour(fg)
 			self.lblContexto.SetBackgroundColour(bg)
-			self._listaCtrl.SetBackgroundColour(acc)
-			self._listaCtrl.SetForegroundColour(fg)
 			self._listaBox.SetBackgroundColour(acc)
 			self._listaBox.SetForegroundColour(fg)
 			self.txtLeitura.SetBackgroundColour(bg)
@@ -925,14 +917,8 @@ class BibliaFrame(wx.Frame):
 			pass
 
 	def _trocarLista(self, usarListBox):
-		novo = self._listaBox if usarListBox else self._listaCtrl
-		antigo = self._listaCtrl if usarListBox else self._listaBox
-		if self.lista is novo:
-			return
-		self.lista = novo
-		antigo.Hide()
-		novo.Show()
-		self._navSizer.Layout()
+		# Lista única — nada a fazer
+		self.lista = self._listaBox
 
 	def _alternarTema(self, checked):
 		try:
@@ -952,7 +938,8 @@ class BibliaFrame(wx.Frame):
 			pass
 
 	def _onTxtUpdateTick(self, event):
-		if event.GetTimer() is self._txtUpdateTimer:
+		timer_id = event.GetId()
+		if timer_id == self._txtUpdateTimer.GetId():
 			if self._pendingTxtVerso is not None:
 				try:
 					self.txtLeitura.Freeze()
@@ -966,7 +953,8 @@ class BibliaFrame(wx.Frame):
 			event.Skip()
 
 	def _onSavePositionTick(self, event):
-		if event.GetTimer() is self._savePositionTimer:
+		timer_id = event.GetId()
+		if timer_id == self._savePositionTimer.GetId():
 			try:
 				livro = self.livroAtual
 				capitulo = self.capituloAtual
@@ -1418,14 +1406,16 @@ class BibliaFrame(wx.Frame):
 		self.leituraIndice = 0
 		self._leituraTotalVersos = 0
 
-		self.txtLeitura.SetValue("Open Bible\n\nSelecione um livro.")
+		self.txtLeitura.SetValue("")
 
 		if announce:
 			if getattr(self, "_primeira_exibicao", True):
-				wx.CallLater(600, lambda: self.anunciar("Selecione um livro"))
+				# Na primeira abertura, o NVDA já lê o título da janela.
+				# Não anunciamos nada aqui — _sequenciaBoasVindasSeNecessario
+				# cuida de dizer "Selecione um livro" após o foco estabilizar.
 				self._primeira_exibicao = False
 			else:
-				self.anunciar("Selecione um livro")
+				pass  # NVDA anuncia o foco na lista automaticamente
 
 	def mostrarCapitulos(self, livro):
 		self._pararLeituraSeAtiva()
@@ -1761,6 +1751,14 @@ class BibliaFrame(wx.Frame):
 		dlg.Destroy()
 		self.lista.SetFocus()
 
+	def _bip(self):
+		"""Emite um bip curto via NVDA para sinalizar limite de navegação."""
+		try:
+			import tones
+			tones.beep(440, 40)
+		except Exception:
+			pass
+
 	def voltar(self):
 		self._pararLeituraSeAtiva()
 
@@ -1773,10 +1771,12 @@ class BibliaFrame(wx.Frame):
 		elif self.nivel == "capitulos":
 			self._ultimoLivroSelecionado = self.livroAtual
 			self.mostrarLivros()
+			self._bip()  # avisa: próximo Escape fecha o programa
 		elif self.nivel in ("busca", "favoritos", "lidos"):
 			self.mostrarLivros()
+			self._bip()  # avisa: próximo Escape fecha o programa
 		else:
-			self.Close()
+			self.Close()  # já está na lista de livros: fecha
 
 	def capituloAnterior(self):
 		self._pararLeituraSeAtiva()
@@ -1841,18 +1841,29 @@ class BibliaFrame(wx.Frame):
 			pass
 
 	def _calcIntervalo(self, texto: str) -> int:
-		base = 250
-		porChar = 12
+		# Estima tempo de fala: ~13ms/char + 400ms de margem após o fim.
+		# O delay começa DEPOIS de anunciar(), então precisa cobrir
+		# o tempo de fala do NVDA mais uma pausa natural entre versículos.
+		base = 400
+		porChar = 13
 		tempo = base + len(texto) * porChar
-		return max(500, min(5000, tempo))
+		return max(800, min(8000, tempo))
 
 	def _toggleLeitura(self):
 		if self.nivel != "versiculos":
 			self.anunciar("Abra um capítulo para iniciar a leitura contínua")
 			return
 		if self.leituraAtiva:
+			# Para o timer e cancela a fala imediatamente
 			self._pararLeituraSeAtiva()
-			self.anunciar("Leitura interrompida")
+			try:
+				import speech as _sp
+				_sp.cancelSpeech()
+			except Exception:
+				pass
+			# leituraIndice aponta para o verso que estava sendo lido —
+			# guardamos para retomar exatamente nele
+			wx.CallLater(150, lambda: self.anunciar("Leitura interrompida"))
 		else:
 			self._iniciarLeituraContinua()
 
@@ -1861,17 +1872,27 @@ class BibliaFrame(wx.Frame):
 		if total_versos <= 0:
 			return
 
+		# Se está retomando após pausa, leituraIndice já aponta para o verso
+		# correto (foi preservado por _pararLeituraSeAtiva).
+		# Se está iniciando do zero, usa a seleção atual da lista.
 		sel = self.lista.GetSelection()
 		if sel != wx.NOT_FOUND and sel < total_versos:
-			self.leituraIndice = sel
+			# Só sobrescreve se o usuário moveu a seleção manualmente
+			# (detectado porque leituraIndice != sel)
+			if not self.leituraAtiva:
+				self.leituraIndice = sel
 
 		if self.leituraIndice >= total_versos:
 			self.leituraIndice = 0
 
 		self.leituraAtiva = True
-		self.anunciar("Leitura contínua iniciada")
+		# Token de sessão: garante que CallLater residual de sessões
+		# anteriores não interfira
+		self._leituraToken = getattr(self, "_leituraToken", 0) + 1
+		token_atual = self._leituraToken
 
-		self._falarECalcularProximo()
+		self.anunciar("Leitura contínua iniciada")
+		wx.CallLater(700, lambda: self._falarECalcularProximo(token_atual))
 
 	def _pararLeituraSeAtiva(self):
 		try:
@@ -1880,8 +1901,13 @@ class BibliaFrame(wx.Frame):
 		except Exception:
 			pass
 		self.leituraAtiva = False
+		# Invalida qualquer CallLater pendente incrementando o token
+		self._leituraToken = getattr(self, "_leituraToken", 0) + 1
 
-	def _falarECalcularProximo(self):
+	def _falarECalcularProximo(self, token=None):
+		# Ignora chamadas de sessões anteriores (token inválido)
+		if token is not None and token != getattr(self, "_leituraToken", None):
+			return
 		if not self.leituraAtiva:
 			return
 
@@ -1908,8 +1934,9 @@ class BibliaFrame(wx.Frame):
 			self._pararLeituraSeAtiva()
 			return
 
+		# Incrementa DEPOIS de ter falado o verso atual (tick = "terminei este, vá pro próximo")
 		self.leituraIndice += 1
-		self._falarECalcularProximo()
+		self._falarECalcularProximo(getattr(self, "_leituraToken", None))
 
 	def _strip_prefix(self, s: str) -> str:
 		return s.lstrip(" ✓")
@@ -2500,7 +2527,7 @@ class BibliaFrame(wx.Frame):
 				if not texto:
 					continue
 
-				match = re.match(r"^(\d?\s*[a-zA-Z\u00C0-\u00FF]+)[\s\.]*(\\d+)[:\.\s]*(\d*)$", texto)
+				match = re.match(r"^(\d?\s*[a-zA-Z\u00C0-\u00FF]+)[\s\.]*(\d+)[:\.\s]*(\d*)$", texto)
 				if match:
 					livro_str = match.group(1).strip()
 					cap_str = match.group(2)
@@ -3617,13 +3644,20 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			wx.CallLater(1500, self._speakRandomFavorite)
 
 	def _speakRandomFavorite(self):
-		favm = FavoritesManager()
-		favoritos = favm.all()
-		if favoritos:
+		try:
+			favm = FavoritesManager()
+			favoritos = favm.all()
+			if not favoritos:
+				return
 			fav = random.choice(favoritos)
 			livro_nome = NOMES_LIVROS.get(fav["livro"], fav["livro"])
 			referencia = f"{livro_nome} {fav['capitulo']}:{fav['versiculo']}"
-			speech.speakMessage(f"{fav['texto']} — {referencia}")
+			try:
+				speech.speakMessage(f"{fav['texto']} — {referencia}")
+			except Exception:
+				pass
+		except Exception:
+			pass
 
 	def terminate(self):
 		try:
@@ -3654,18 +3688,28 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	def _iniciar_interface(self):
 		try:
-			if self._frame and self._frame.IsShown():
+			if self._frame:
 				try:
-					self._frame.Raise()
-					self._frame.SetFocus()
-					wx.CallAfter(self._frame._ensureListFocus)
-					return
+					isOk = self._frame.IsShown()
 				except Exception:
+					isOk = False
 					try:
 						self._frame.Destroy()
 					except Exception:
 						pass
 					self._frame = None
+				if isOk:
+					try:
+						self._frame.Raise()
+						self._frame.SetFocus()
+						wx.CallAfter(self._frame._ensureListFocus)
+						return
+					except Exception:
+						try:
+							self._frame.Destroy()
+						except Exception:
+							pass
+						self._frame = None
 
 			cm = ConfigManager()
 			bm = BibleManager(PLUGIN_BASE_DIR)
@@ -3720,11 +3764,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 							webbrowser.open("https://drive.google.com/drive/folders/1THS2L9GiCx_rWWCJ23JGh3Ws7qVup0uE?usp=sharing")
 
 
-						frame_vazio = BibliaFrame([], [], bm, NotesManager(""), None, cm, favm)
-						frame_vazio.Show()
-						frame_vazio.Raise()
-						frame_vazio.SetFocus()
-						wx.CallAfter(frame_vazio._ensureListFocus)
+						self._frame = BibliaFrame([], [], bm, NotesManager(""), None, cm, favm)
+						self._frame.Show()
+						self._frame.Raise()
+						self._frame.SetFocus()
+						wx.CallAfter(self._frame._ensureListFocus)
 						if ui:
 							ui.message("Open Bible aberto. Use Ctrl+G para abrir o Gerenciador de B\u00edblias e importar um arquivo JSON.")
 					except Exception:

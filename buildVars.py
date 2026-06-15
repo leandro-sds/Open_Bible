@@ -22,20 +22,22 @@ addon_info = AddonInfo(
 	# Add-on description
 	# Translators: Long description to be shown for this add-on on add-on information from add-on store
 	addon_description=_(
-		"""Bíblia de estudos para o leitor de telas NVDA.
-		Você pode navegar por livro, capítulo e versículo, pesquisar, favoritar, anotar, copiar versículos,
-		comparar versões, marcar capítulos como lidos, gerenciar favoritos e anotações, e muito mais."""
+		"Bíblia de estudos para o leitor de telas NVDA. "
+		"Navegue por livro, capítulo e versículo, pesquise, favorite, anote, copie versículos, "
+		"compare versões, marque capítulos como lidos, gerencie favoritos e anotações, e muito mais."
 	),
 	# version
-	addon_version="2026.05.02",
+	addon_version="2026.06.15",
 	# Brief changelog for this version
 	# Translators: what's new content for the add-on version to be shown in the add-on store
 	addon_changelog=_(
-		"""Melhorias desta versão:
-Compatibilidade com NVDA 2026.1"""
+		"Correções de bugs e melhorias de acessibilidade: "
+		"eliminado anúncio indevido ao iniciar, corrigida navegação contínua (Ctrl+L), "
+		"corrigido Ctrl+R (ir para referência), eliminado anúncio duplo de painel, "
+		"adicionado bip ao retornar ao índice de livros."
 	),
 	# Author(s)
-	addon_author="Leandro Souza",
+	addon_author="Leandro Souza <leandro-sds@github>",
 	# URL for the add-on documentation support
 	addon_url="https://github.com/leandro-sds/Open_Bible",
 	# URL for the add-on repository where the source code can be found
@@ -51,8 +53,8 @@ Compatibilidade com NVDA 2026.1"""
 	addon_updateChannel=None,
 	# Add-on license such as GPL 2
 	addon_license="GPL-2.0-only",
-	# URL for the license document the ad-on is licensed under
-	addon_licenseURL=None,
+	# URL for the license document the add-on is licensed under
+	addon_licenseURL="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html",
 )
 
 # Define the python files that are the sources of your add-on.
@@ -69,7 +71,7 @@ i18nSources: list[str] = pythonSources + ["buildVars.py"]
 excludedFiles: list[str] = []
 
 # Base language for the NVDA add-on
-baseLanguage: str = "pt"
+baseLanguage: str = "pt_BR"
 
 # Markdown extensions for add-on documentation
 markdownExtensions: list[str] = []
