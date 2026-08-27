@@ -27,7 +27,7 @@ addon_info = AddonInfo(
 		"compare versões, marque capítulos como lidos, gerencie favoritos e anotações, e muito mais."
 	),
 	# version
-	addon_version="2026.07.25",
+	addon_version="2026.08.26",
 	# Brief changelog for this version
 	# Translators: what's new content for the add-on version to be shown in the add-on store
 	addon_changelog=_(

@@ -1,4 +1,5 @@
 import wx
+import ctypes
 import globalPluginHandler
 import addonHandler
 import json
@@ -110,6 +111,13 @@ class ConfigManager:
 		self.data["versao"] = versao
 		self._save()
 
+	def get_tema_escuro(self):
+		return bool(self.data.get("temaEscuro", False))
+
+	def set_tema_escuro(self, escuro):
+		self.data["temaEscuro"] = bool(escuro)
+		self._save()
+
 	def get_last_position(self, versao):
 		posicoes = self.data.get("ultimaPosicao", {})
 		pos = posicoes.get(versao)
@@ -124,14 +132,16 @@ class ConfigManager:
 		self._save()
 
 	def get_skip_continue_prompt(self):
-		return bool(self.data.get("naoMostrarContinuar"))
+		# Padrão True = NÃO pergunta ao abrir (item do menu vem desmarcado).
+		return bool(self.data.get("naoMostrarContinuar", True))
 
 	def set_skip_continue_prompt(self, flag: bool):
 		self.data["naoMostrarContinuar"] = bool(flag)
 		self._save()
 
 	def get_skip_exit_prompt(self):
-		return bool(self.data.get("naoPerguntarFechar"))
+		# Padrão False = PERGUNTA ao fechar (item do menu vem marcado).
+		return bool(self.data.get("naoPerguntarFechar", False))
 
 	def set_skip_exit_prompt(self, flag: bool):
 		self.data["naoPerguntarFechar"] = bool(flag)
@@ -247,6 +257,17 @@ class ReadChaptersManager:
 		except Exception:
 			pass
 
+def ocultar_pasta(caminho):
+	"""Marca uma pasta como Oculta pro Windows (atributo nativo do
+	sistema de arquivos) — some da visão padrão do Explorer, sem afetar
+	em nada a leitura/escrita normal de arquivos ali dentro."""
+	try:
+		FILE_ATTRIBUTE_HIDDEN = 0x02
+		ctypes.windll.kernel32.SetFileAttributesW(str(caminho), FILE_ATTRIBUTE_HIDDEN)
+	except Exception:
+		pass
+
+
 class BibleManager:
 	def __init__(self, pluginBaseDir):
 		self.baseDir = pluginBaseDir
@@ -262,6 +283,7 @@ class BibleManager:
 		try:
 			if not os.path.isdir(self.bibliasDir):
 				os.makedirs(self.bibliasDir, exist_ok=True)
+			ocultar_pasta(self.bibliasDir)
 			for f in sorted(os.listdir(self.bibliasDir)):
 				if f.lower().endswith(".json"):
 					base = f[:-5]
@@ -583,11 +605,20 @@ class BibliaFrame(wx.Frame):
 		miAumentarFonte = menuExib.Append(wx.ID_ANY, "Aumentar fonte\tCtrl++", "Aumentar tamanho da fonte da leitura")
 		miDiminuirFonte = menuExib.Append(wx.ID_ANY, "Diminuir fonte\tCtrl+-", "Diminuir tamanho da fonte da leitura")
 		self.miTemaEscuro = menuExib.AppendCheckItem(wx.ID_ANY, "Tema escuro", "Alternar tema escuro/claro")
-		self.miTemaEscuro.Check(True)
+		self.miTemaEscuro.Check(self.configManager.get_tema_escuro())
 		menuExib.AppendSeparator()
 		self.miFalarAoIniciar = menuExib.AppendCheckItem(wx.ID_ANY, "Mostrar versículo ao iniciar", "Lê um versículo aleatório dos seus favoritos ao iniciar o NVDA")
 		self.miFalarAoIniciar.Check(self.configManager.get_speak_on_startup())
 		self.Bind(wx.EVT_MENU, self._onToggleSpeakOnStartup, self.miFalarAoIniciar)
+		menuExib.AppendSeparator()
+		self.miPerguntarContinuar = menuExib.AppendCheckItem(wx.ID_ANY, "Perguntar se deseja continuar a leitura ao abrir",
+			"Se desmarcado, abre direto no índice de livros sem perguntar")
+		self.miPerguntarContinuar.Check(not self.configManager.get_skip_continue_prompt())
+		self.Bind(wx.EVT_MENU, self._onTogglePerguntarContinuar, self.miPerguntarContinuar)
+		self.miPerguntarFechar = menuExib.AppendCheckItem(wx.ID_ANY, "Perguntar antes de fechar o Open Bible",
+			"Se desmarcado, fecha direto sem perguntar")
+		self.miPerguntarFechar.Check(not self.configManager.get_skip_exit_prompt())
+		self.Bind(wx.EVT_MENU, self._onTogglePerguntarFechar, self.miPerguntarFechar)
 
 		menuAjuda = wx.Menu()
 		miVisitarSite = menuAjuda.Append(wx.ID_ANY, "&Github", "Abre o repositório do Open Bible no GitHub no navegador")
@@ -598,6 +629,8 @@ class BibliaFrame(wx.Frame):
 		menuBar.Append(menuExib, "&Exibição")
 		menuBar.Append(menuAjuda, "&Ajuda")
 		self.SetMenuBar(menuBar)
+
+		self.statusBar = self.CreateStatusBar(1)
 
 		mainPanel = wx.Panel(self)
 		mainSizer = wx.BoxSizer(wx.VERTICAL)
@@ -637,30 +670,47 @@ class BibliaFrame(wx.Frame):
 		self.btnPagProxima = wx.Button(mainPanel, label="Próxima Página")
 		self.btnLimparBusca = wx.Button(mainPanel, label="Limpar Busca")
 
-		self.btnSizer.Add(self.btnLivroAnterior, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnAnterior, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnProximo, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnProximoLivro, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnMarcarLido, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnCopiar, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnAdicionarNota, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnRemoverNota, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnBuscar, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnFavoritos, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnPagAnterior, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnPagProxima, 0, wx.EXPAND | wx.ALL, 5)
-		self.btnSizer.Add(self.btnLimparBusca, 0, wx.EXPAND | wx.ALL, 5)
+		self._gruposBotoes = []  # (StaticBox, StaticBoxSizer, [botões]) — usado pra retemar e mostrar/esconder
 
-		navSizer.Add(self.btnSizer, 0, wx.EXPAND | wx.ALL, 8)
+		def _grupo(titulo, botoes):
+			box = wx.StaticBox(mainPanel, label=titulo)
+			boxSizer = wx.StaticBoxSizer(box, wx.VERTICAL)
+			for b in botoes:
+				# Largura mínima fixa e generosa: depender só do
+				# GetBestSize() dentro do StaticBoxSizer estava cortando
+				# o texto dos botões mais longos ("Marcar capítulo como
+				# lido", "Copiar Seleção/Versículo").
+				largura_necessaria = max(220, b.GetBestSize().width + 10)
+				b.SetMinSize(wx.Size(largura_necessaria, -1))
+				boxSizer.Add(b, 0, wx.EXPAND | wx.ALL, 4)
+			self.btnSizer.Add(boxSizer, 0, wx.EXPAND | wx.ALL, 6)
+			self._gruposBotoes.append((box, boxSizer, list(botoes)))
+
+		_grupo("Navegação", [self.btnLivroAnterior, self.btnAnterior, self.btnProximo, self.btnProximoLivro])
+		_grupo("Ações", [self.btnMarcarLido, self.btnCopiar, self.btnAdicionarNota, self.btnRemoverNota])
+		_grupo("Busca", [self.btnBuscar, self.btnLimparBusca, self.btnPagAnterior, self.btnPagProxima])
+		_grupo("Favoritos", [self.btnFavoritos])
+
+		navSizer.Add(self.btnSizer, 0, wx.EXPAND | wx.ALL, 4)
 		mainSizer.Add(navSizer, 3, wx.EXPAND)
+
+		# Sem rótulo próprio, o leitor de tela usa o texto do controle
+		# criado imediatamente antes deste (o último botão da fileira
+		# acima) como nome acessível — o NVDA anunciava "Favoritos"
+		# (ou outro botão qualquer) ao entrar na área de leitura, em
+		# vez de dizer do que se trata. O parâmetro name= do wx não
+		# resolve isso: é só um nome interno da biblioteca, não o nome
+		# acessível de verdade.
+		self.lblLeitura = wx.StaticText(mainPanel, label="Leitura:")
+		mainSizer.Add(self.lblLeitura, 0, wx.LEFT | wx.RIGHT | wx.TOP, 8)
 
 		self.txtLeitura = wx.TextCtrl(
 			mainPanel,
 			style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2,
 			name="Área de leitura e contexto"
 		)
-		self._temaEscuroAtivo = True
-		self._aplicarTema(escuro=True)
+		self._temaEscuroAtivo = self.configManager.get_tema_escuro()
+		self._aplicarTema(escuro=self._temaEscuroAtivo)
 
 		try:
 			fontRead = self.txtLeitura.GetFont()
@@ -791,6 +841,17 @@ class BibliaFrame(wx.Frame):
 			self._restaurarBackup()
 
 	def _realizarBackup(self):
+		# Pergunta ANTES do diálogo de salvar, em vez de tentar encaixar
+		# uma caixa de marcação dentro do seletor de arquivo nativo do
+		# Windows — mais simples e mais confiável com leitor de tela.
+		incluirBiblias = wx.MessageBox(
+			"Deseja incluir suas Bíblias no backup, além de favoritos, "
+			"anotações e configurações?\n\n"
+			"Isso deixa o arquivo bem maior, mas garante que você recupera "
+			"exatamente as versões que tinha, mesmo as que não vêm por "
+			"padrão no addon.",
+			"Incluir Bíblias no backup?", wx.YES_NO | wx.ICON_QUESTION, self) == wx.YES
+
 		default_name = f"backup_openbible_{datetime.date.today()}.zip"
 		fd = wx.FileDialog(
 			self, "Salvar Backup",
@@ -802,12 +863,41 @@ class BibliaFrame(wx.Frame):
 		if fd.ShowModal() == wx.ID_OK:
 			path = fd.GetPath()
 			try:
+				# A pasta de dados pode ainda não existir (primeiro uso do
+				# addon). Sem isso, o os.listdir abaixo estourava.
+				os.makedirs(NVDA_CONFIG_BASE, exist_ok=True)
+				arquivosDados = [f for f in os.listdir(NVDA_CONFIG_BASE) if f.lower().endswith(".json")]
+
+				arquivosBiblias = []
+				if incluirBiblias:
+					bibliasDir = self.bibleManager.bibliasDir
+					if os.path.isdir(bibliasDir):
+						arquivosBiblias = [f for f in os.listdir(bibliasDir) if f.lower().endswith(".json")]
+
+				if not arquivosDados and not arquivosBiblias:
+					wx.MessageBox(
+						"Não há nada para salvar ainda: nenhum favorito, anotação "
+						"ou configuração foi criado até agora.",
+						"Open Bible", wx.OK | wx.ICON_INFORMATION)
+					fd.Destroy()
+					return
+
+				# Cada grupo fica numa subpasta dentro do zip (dados/ e
+				# biblias/) — é isso que permite, na hora de restaurar,
+				# saber pra qual pasta cada arquivo deve voltar.
 				with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as zf:
-					for filename in os.listdir(NVDA_CONFIG_BASE):
-						if filename.endswith(".json"):
-							full_path = os.path.join(NVDA_CONFIG_BASE, filename)
-							zf.write(full_path, arcname=filename)
-				wx.MessageBox("Backup criado com sucesso!", "Open Bible", wx.OK | wx.ICON_INFORMATION)
+					for filename in arquivosDados:
+						full_path = os.path.join(NVDA_CONFIG_BASE, filename)
+						zf.write(full_path, arcname=f"dados/{filename}")
+					for filename in arquivosBiblias:
+						full_path = os.path.join(self.bibleManager.bibliasDir, filename)
+						zf.write(full_path, arcname=f"biblias/{filename}")
+
+				msg = f"Backup criado com sucesso!\n\n{len(arquivosDados)} arquivo(s) de dados"
+				if incluirBiblias:
+					msg += f" e {len(arquivosBiblias)} Bíblia(s)"
+				msg += f" salvos em:\n{path}"
+				wx.MessageBox(msg, "Open Bible", wx.OK | wx.ICON_INFORMATION)
 			except Exception as e:
 				wx.MessageBox(f"Erro ao criar backup: {e}", "Erro", wx.OK | wx.ICON_ERROR)
 		fd.Destroy()
@@ -827,11 +917,55 @@ class BibliaFrame(wx.Frame):
 					if not has_json:
 						raise ValueError("O arquivo ZIP não parece conter dados do Open Bible.")
 
-					def _safe_extract_backup_zip(zfLocal, destino):
-						destinoAbs = os.path.abspath(destino)
-						if not _ensure_dir(destinoAbs):
-							raise FileNotFoundError("A pasta de configuração do NVDA não foi encontrada. Feche e reabra o NVDA e tente novamente.")
+					# Pré-checagem: esse backup tem Bíblias dentro? Isso
+					# decide se vale a pena perguntar antes de mexer na
+					# pasta de Bíblias — sem essa pergunta, restaurar só
+					# SOMARIA os arquivos do backup aos que já existem,
+					# em vez de trazer de volta exatamente a coleção que
+					# a pessoa tinha (uma Bíblia removida antes do backup,
+					# mas presente na instalação atual, ficaria pra trás
+					# em vez de sumir de novo).
+					tem_biblias_no_zip = any(
+						n.replace("\\", "/").split("/")[0].lower() == "biblias"
+						and n.lower().endswith(".json")
+						for n in zf.namelist() if isinstance(n, str)
+					)
+
+					substituirBiblias = False
+					if tem_biblias_no_zip:
+						substituirBiblias = wx.MessageBox(
+							"Este backup contém Bíblias.\n\n"
+							"Restaurá-las vai SUBSTITUIR toda a sua coleção atual "
+							"pela do backup — qualquer versão que você tenha hoje "
+							"e não esteja neste backup será removida, exatamente "
+							"como estava no momento em que o backup foi feito.\n\n"
+							"Deseja restaurar as Bíblias também?",
+							"Restaurar Bíblias?", wx.YES_NO | wx.ICON_WARNING, self) == wx.YES
+
+					def _safe_extract_backup_zip(zfLocal, destinoDados, destinoBiblias, substituirBiblias):
+						destinoDadosAbs = os.path.abspath(destinoDados)
+						if not _ensure_dir(destinoDadosAbs):
+							raise FileNotFoundError("Não foi possível acessar a pasta de configuração do NVDA. Feche e reabra o NVDA e tente novamente.")
+						destinoBibliasAbs = os.path.abspath(destinoBiblias)
+						_ensure_dir(destinoBibliasAbs)  # se falhar aqui, só as bíblias do backup são puladas
+
+						if substituirBiblias:
+							# Limpa a coleção atual ANTES de repor — é isso
+							# que torna a restauração uma substituição de
+							# verdade, e não uma soma por cima do que já
+							# estava instalado.
+							try:
+								for antigo in os.listdir(destinoBibliasAbs):
+									if antigo.lower().endswith(".json"):
+										try:
+											os.remove(os.path.join(destinoBibliasAbs, antigo))
+										except Exception:
+											pass
+							except Exception:
+								pass
+
 						extraiu = False
+						biblias_restauradas = 0
 						for info in zfLocal.infolist():
 							nome = info.filename
 							if not isinstance(nome, str) or not nome.lower().endswith(".json"):
@@ -842,9 +976,27 @@ class BibliaFrame(wx.Frame):
 							partes = [p for p in nome.split("/") if p not in ("", ".")]
 							if any(p == ".." for p in partes):
 								continue
+							if not partes:
+								continue
+
+							# A subpasta dentro do zip ("dados/" ou "biblias/")
+							# diz pra onde o arquivo deve voltar. Backups
+							# antigos, feitos antes dessa separação existir,
+							# não têm subpasta nenhuma — nesse caso, o
+							# comportamento de sempre é mantido: tudo vai
+							# para a pasta de dados.
 							base = os.path.basename(nome)
 							if not base.lower().endswith(".json"):
 								continue
+
+							ehBiblia = len(partes) > 1 and partes[0].lower() == "biblias"
+							if ehBiblia:
+								if not substituirBiblias:
+									continue  # usuário optou por não restaurar Bíblias
+								destinoAbs = destinoBibliasAbs
+							else:
+								destinoAbs = destinoDadosAbs
+
 							dest = os.path.abspath(os.path.join(destinoAbs, base))
 							if not dest.startswith(destinoAbs + os.sep):
 								continue
@@ -852,10 +1004,22 @@ class BibliaFrame(wx.Frame):
 							with zfLocal.open(info, "r") as origem, open(dest, "wb") as saida:
 								shutil.copyfileobj(origem, saida)
 							extraiu = True
-						return extraiu
+							if ehBiblia:
+								biblias_restauradas += 1
+						return extraiu, biblias_restauradas
 
-					if not _safe_extract_backup_zip(zf, NVDA_CONFIG_BASE):
+					extraiu, biblias_restauradas = _safe_extract_backup_zip(
+						zf, NVDA_CONFIG_BASE, self.bibleManager.bibliasDir, substituirBiblias)
+					if not extraiu:
 						raise ValueError("Nenhum arquivo JSON válido foi encontrado no backup.")
+
+					if biblias_restauradas:
+						# Bíblias novas podem ter chegado — a lista de
+						# versões precisa ser lida de novo do disco.
+						try:
+							self.bibleManager.versoes = self.bibleManager._detectarVersoes()
+						except Exception:
+							pass
 
 				self.configManager = ConfigManager()
 				self.favoritesManager = FavoritesManager()
@@ -875,6 +1039,24 @@ class BibliaFrame(wx.Frame):
 				self.favoritos = self.favoritesManager.all()
 				self.lidosLista = self.readManager.all()
 
+				# As configurações restauradas precisam ser REAPLICADAS na
+				# interface. Sem isto, o backup era lido corretamente do
+				# arquivo mas a tela continuava com o tema antigo e os
+				# itens de menu desatualizados — dando a impressão de que
+				# a restauração não tinha funcionado.
+				try:
+					escuroRestaurado = self.configManager.get_tema_escuro()
+					self._temaEscuroAtivo = escuroRestaurado
+					self.miTemaEscuro.Check(escuroRestaurado)
+					self._alternarTema(escuroRestaurado)
+				except Exception:
+					pass
+				try:
+					self.miPerguntarContinuar.Check(not self.configManager.get_skip_continue_prompt())
+					self.miPerguntarFechar.Check(not self.configManager.get_skip_exit_prompt())
+				except Exception:
+					pass
+
 				wx.MessageBox("Backup restaurado com sucesso! O Open Bible foi atualizado.", "Open Bible", wx.OK | wx.ICON_INFORMATION)
 				self.mostrarLivros()
 
@@ -891,7 +1073,22 @@ class BibliaFrame(wx.Frame):
 	def _onToggleDarkMode(self, event):
 		is_checked = self.miTemaEscuro.IsChecked()
 		self._alternarTema(is_checked)
+		self.configManager.set_tema_escuro(is_checked)
 		msg = "Tema escuro ativado" if is_checked else "Tema claro ativado"
+		wx.CallLater(150, lambda: self.anunciar(msg))
+
+	def _onTogglePerguntarContinuar(self, event):
+		perguntar = self.miPerguntarContinuar.IsChecked()
+		self.configManager.set_skip_continue_prompt(not perguntar)
+		msg = "Vai perguntar se deseja continuar a leitura ao abrir" if perguntar \
+			else "Não vai mais perguntar — vai abrir direto no índice de livros"
+		wx.CallLater(150, lambda: self.anunciar(msg))
+
+	def _onTogglePerguntarFechar(self, event):
+		perguntar = self.miPerguntarFechar.IsChecked()
+		self.configManager.set_skip_exit_prompt(not perguntar)
+		msg = "Vai perguntar antes de fechar o Open Bible" if perguntar \
+			else "Não vai mais perguntar — vai fechar direto"
 		wx.CallLater(150, lambda: self.anunciar(msg))
 
 	def _aplicarTema(self, escuro=True):
@@ -908,10 +1105,26 @@ class BibliaFrame(wx.Frame):
 			self.SetBackgroundColour(bg)
 			self.lblContexto.SetForegroundColour(fg)
 			self.lblContexto.SetBackgroundColour(bg)
+			self.lblLeitura.SetForegroundColour(fg)
+			self.lblLeitura.SetBackgroundColour(bg)
 			self._listaBox.SetBackgroundColour(acc)
 			self._listaBox.SetForegroundColour(fg)
 			self.txtLeitura.SetBackgroundColour(bg)
 			self.txtLeitura.SetForegroundColour(fg)
+
+			for box, boxSizer, botoes in getattr(self, "_gruposBotoes", []):
+				try:
+					box.SetForegroundColour(fg)
+					box.SetBackgroundColour(bg)
+				except Exception:
+					pass
+				for b in botoes:
+					try:
+						b.SetBackgroundColour(acc)
+						b.SetForegroundColour(fg)
+					except Exception:
+						pass
+
 			self.Refresh()
 		except Exception:
 			pass
@@ -998,7 +1211,7 @@ class BibliaFrame(wx.Frame):
 			except Exception:
 				pass
 
-	def _atualizarContexto(self, livro=None, capitulo=None):
+	def _atualizarContexto(self, livro=None, capitulo=None, versiculo=None):
 		nomeLivro = NOMES_LIVROS.get(livro or self.livroAtual, livro or self.livroAtual) or ""
 		cap = capitulo if capitulo is not None else self.capituloAtual
 		texto = f"{nomeLivro}" + (f" — capítulo {cap}" if cap else "")
@@ -1006,14 +1219,33 @@ class BibliaFrame(wx.Frame):
 			self.lblContexto.SetLabel(texto)
 		except Exception:
 			pass
+		try:
+			if hasattr(self, "statusBar") and self.statusBar:
+				partes = []
+				if self.versaoAtual:
+					partes.append(f"Versão: {self.versaoAtual}")
+				if texto:
+					partes.append(texto)
+				if versiculo is not None:
+					partes.append(f"Versículo {versiculo}")
+				self.statusBar.SetStatusText("  |  ".join(partes))
+		except Exception:
+			pass
 
 	def sobre(self):
 		info = (
-			"Open Bible\n"
-			"Navegue por livros, capítulos, versículos, busque termos, copie e gerencie notas.\n\n"
-			"Pressione F1 para ver a lista de atalhos."
+			"Open Bible\n\n"
+			"Este programa foi idealizado e desenvolvido por Leandro Souza "
+			"com o objetivo de tornar a Palavra de Deus verdadeiramente "
+			"acessível às pessoas com deficiência visual, que não podem "
+			"ler a Bíblia impressa.\n\n"
+			"Navegue por livros, capítulos e versículos, pesquise termos, "
+			"copie textos, crie favoritos e anotações — tudo pelo teclado "
+			"e com suporte a leitores de tela.\n\n"
+			"Pressione F1 para ver a lista completa de atalhos.\n\n"
+			"Faça bom proveito, e que Deus te abençoe!"
 		)
-		dlg = wx.MessageDialog(self, info, "Sobre", wx.OK | wx.ICON_INFORMATION)
+		dlg = wx.MessageDialog(self, info, "Sobre o Open Bible", wx.OK | wx.ICON_INFORMATION)
 		dlg.ShowModal()
 		dlg.Destroy()
 
@@ -1234,6 +1466,7 @@ class BibliaFrame(wx.Frame):
 				hbox.Add(btnNo, 0, wx.ALL, 5)
 				vbox.Add(hbox, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 				dlg.SetSizerAndFit(vbox)
+				dlg.CenterOnParent()
 				self._bind_global_shortcuts_to_dialog(dlg)
 				def _onYes(e): dlg.EndModal(wx.ID_YES)
 				def _onNo(e): dlg.EndModal(wx.ID_NO)
@@ -1359,11 +1592,19 @@ class BibliaFrame(wx.Frame):
 			self.btnLimparBusca
 		]
 
+		visible_set = set(visible_buttons)
+
 		for btn in all_buttons:
 			btn.Hide()
 
 		for btn in visible_buttons:
 			btn.Show()
+
+		# Esconde a caixa (moldura + título) inteira quando nenhum botão
+		# dela estiver visível, em vez de deixar uma moldura vazia.
+		for box, boxSizer, botoes in getattr(self, "_gruposBotoes", []):
+			grupo_tem_botao_visivel = any(b in visible_set for b in botoes)
+			self.btnSizer.Show(boxSizer, show=grupo_tem_botao_visivel, recursive=True)
 
 		self.btnSizer.Layout()
 
@@ -1463,21 +1704,56 @@ class BibliaFrame(wx.Frame):
 	def _renderLeituraCapitulo(self, livro, capitulo, linhas_versos, notasCap):
 		try:
 			self.txtLeitura.Freeze()
-			cab = NOMES_LIVROS.get(livro, livro) + f" {capitulo}\n\n"
+			self.txtLeitura.Clear()
 
-			partes_texto = [cab]
-			partes_texto.extend(linhas_versos)
+			fonteBase = self.txtLeitura.GetFont()
+			corTexto = self.txtLeitura.GetForegroundColour()
+			corTitulo = self.lblContexto.GetForegroundColour()
+
+			fonteTitulo = wx.Font(fonteBase)
+			fonteTitulo.SetWeight(wx.FONTWEIGHT_BOLD)
+			fonteTitulo.SetPointSize(fonteBase.GetPointSize() + 2)
+			estiloTitulo = wx.TextAttr(corTitulo)
+			estiloTitulo.SetFont(fonteTitulo)
+
+			fonteNumero = wx.Font(fonteBase)
+			fonteNumero.SetWeight(wx.FONTWEIGHT_BOLD)
+			estiloNumero = wx.TextAttr(corTexto)
+			estiloNumero.SetFont(fonteNumero)
+
+			estiloNormal = wx.TextAttr(corTexto)
+			estiloNormal.SetFont(fonteBase)
+
+			self.txtLeitura.SetDefaultStyle(estiloTitulo)
+			self.txtLeitura.AppendText(NOMES_LIVROS.get(livro, livro) + f" {capitulo}\n\n")
+
+			for linha in linhas_versos:
+				if ": " in linha:
+					prefixo, resto = linha.split(": ", 1)
+					self.txtLeitura.SetDefaultStyle(estiloNumero)
+					self.txtLeitura.AppendText(prefixo + ": ")
+					self.txtLeitura.SetDefaultStyle(estiloNormal)
+					# Linha em branco extra entre versículos = mais espaçamento,
+					# facilita achar onde um versículo termina e outro começa.
+					self.txtLeitura.AppendText(resto + "\n\n")
+				else:
+					self.txtLeitura.SetDefaultStyle(estiloNormal)
+					self.txtLeitura.AppendText(linha + "\n")
 
 			if notasCap:
-				partes_texto.append("\n---- Anotações ----")
+				self.txtLeitura.SetDefaultStyle(estiloNormal)
+				self.txtLeitura.AppendText("\n---- Anotações ----\n")
 				for n in notasCap:
 					if "versiculo" in n:
-						partes_texto.append(f"Nota {n['versiculo']}: {n['nota']}")
+						self.txtLeitura.AppendText(f"Nota {n['versiculo']}: {n['nota']}\n")
 					else:
-						partes_texto.append(f"Nota capítulo {capitulo}: {n['nota']}")
+						self.txtLeitura.AppendText(f"Nota capítulo {capitulo}: {n['nota']}\n")
 
-			texto_completo = "\n".join(partes_texto)
-			self.txtLeitura.SetValue(texto_completo)
+			# As várias chamadas de AppendText/SetDefaultStyle em sequência
+			# podem deixar um trecho "selecionado" residualmente, que
+			# aparece como uma caixa cinza-clara de fundo (seleção inativa
+			# do Windows) atrás dos primeiros versículos. Limpa isso.
+			self.txtLeitura.SetSelection(0, 0)
 			self.txtLeitura.ShowPosition(0)
 		finally:
 			try:
@@ -1756,6 +2032,16 @@ class BibliaFrame(wx.Frame):
 		try:
 			import tones
 			tones.beep(440, 40)
+		except Exception:
+			pass
+
+	def _bipDiscreto(self):
+		"""Bip mais suave, usado só como sinalização passageira (ex: ao
+		passar por um capítulo já lido) — não deve chamar tanta atenção
+		quanto o bip de aviso de fechamento do programa."""
+		try:
+			import tones
+			tones.beep(880, 15)
 		except Exception:
 			pass
 
@@ -2975,6 +3261,15 @@ class BibliaFrame(wx.Frame):
 				wx.CallAfter(self.proximoCapitulo)
 			return
 
+		# Fora da lista de versículos, as setas esquerda/direita não têm
+		# função no programa. Sem este bloqueio, o Windows aplica o
+		# comportamento padrão de listas de coluna única, onde elas movem
+		# a seleção igual às setas cima/baixo — o que confunde, porque dá
+		# a impressão de que estão "folheando" livros ou capítulos.
+		if keyCode in (wx.WXK_LEFT, wx.WXK_RIGHT) and not alt and not ctrl and not shift:
+			if not is_interactive:
+				return
+
 		if ctrl and not shift and not alt and keyCode == ord('N'):
 			self.adicionarNota()
 			return
@@ -3074,7 +3369,7 @@ class BibliaFrame(wx.Frame):
 			if idx != wx.NOT_FOUND and idx < numVersos:
 				v = self._versosLista[idx]
 				try:
-					self._atualizarContexto()
+					self._atualizarContexto(versiculo=v.get('versiculo'))
 					novoTexto = f"{v['versiculo']}: {v['texto']}"
 					self._pendingTxtVerso = novoTexto
 					if self._txtUpdateTimer.IsRunning():
@@ -3082,6 +3377,16 @@ class BibliaFrame(wx.Frame):
 					self._txtUpdateTimer.Start(80, oneShot=True)
 					if not self.leituraAtiva:
 						self.leituraIndice = idx
+				except Exception:
+					pass
+
+		elif self.nivel == "capitulos":
+			idx = self.lista.GetSelection()
+			if idx != wx.NOT_FOUND and idx < len(self.capitulos):
+				try:
+					capitulo = self.capitulos[idx]
+					if self.readManager.is_read(self.livroAtual, capitulo):
+						self._bipDiscreto()
 				except Exception:
 					pass
 
@@ -3130,9 +3435,6 @@ class BibliaFrame(wx.Frame):
 
 		if todas:
 			clb.Check(0, True)
-
-		aviso = wx.StaticText(dlg, label="Limite: 10.")
-		vbox.Add(aviso, 0, wx.ALL, 6)
 
 		hbox = wx.BoxSizer(wx.HORIZONTAL)
 		btnOK = wx.Button(dlg, wx.ID_OK, "Comparar")
@@ -3440,6 +3742,7 @@ class BibliaFrame(wx.Frame):
 		self.btnCopiar.Enable()
 		self.btnAdicionarNota.Disable()
 		self.btnRemoverNota.Disable()
+		self.btnMarcarLido.Disable()
 		self.btnLimparBusca.Enable()
 		totalPaginas = (len(self.resultadosBusca) - 1) // self.itensPorPagina if self.resultadosBusca else 0
 		if self.paginaAtual > 0:
@@ -3463,6 +3766,7 @@ class BibliaFrame(wx.Frame):
 		self.btnCopiar.Enable()
 		self.btnAdicionarNota.Disable()
 		self.btnRemoverNota.Disable()
+		self.btnMarcarLido.Disable()
 		totalPaginas = (len(self.favoritos) - 1) // self.favItensPorPagina if self.favoritos else 0
 		if self.favPaginaAtual > 0:
 			self.btnPagAnterior.Enable()
@@ -3617,7 +3921,7 @@ class BibliaFrame(wx.Frame):
 
 		btnImportar.Bind(wx.EVT_BUTTON, onImportar)
 		btnRemover.Bind(wx.EVT_BUTTON, onRemover)
-		btnBaixar.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open("https://drive.google.com/drive/folders/1THS2L9GiCx_rWWCJ23JGh3Ws7qVup0uE?usp=sharing"))
+		btnBaixar.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open("https://openbible.com.br/windows/biblias/"))
 		btnTornarPadrao.Bind(wx.EVT_BUTTON, onTornarPadrao)
 		btnFechar.Bind(wx.EVT_BUTTON, lambda e: dlg.Close())
 
@@ -3730,7 +4034,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 							"Para usar o Open Bible voc\u00ea precisa baixar ao menos\n"
 							"um arquivo de B\u00edblia (.json) e import\u00e1-lo pelo\n"
 							"Gerenciador de B\u00edblias (Ctrl+G).\n\n"
-							"Deseja abrir o Google Drive para baixar as B\u00edblias agora?"
+							"Deseja abrir a p\u00e1gina de B\u00edblias para baixar agora?"
 						))
 						vbox.Add(lbl, 0, wx.ALL, 14)
 
@@ -3761,7 +4065,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 						dlg.Destroy()
 
 						if res == wx.ID_YES:
-							webbrowser.open("https://drive.google.com/drive/folders/1THS2L9GiCx_rWWCJ23JGh3Ws7qVup0uE?usp=sharing")
+							webbrowser.open("https://openbible.com.br/windows/biblias/")
 
 
 						self._frame = BibliaFrame([], [], bm, NotesManager(""), None, cm, favm)
